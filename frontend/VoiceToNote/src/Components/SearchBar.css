@@ -1,0 +1,22 @@
+#header {
+    display: flex;
+    background-color: rgba(255, 255, 255, 0.8); /* Apple frosted white */
+    border-bottom: 1px solid #d2d2d7; /* Apple gray divider line */
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    height: 48px;
+    padding: 4px;
+}
+
+.search-bar {
+    display: flex;
+    width: 100%;
+    max-width: 600px;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.04);
+    border-radius: 8px;
+}

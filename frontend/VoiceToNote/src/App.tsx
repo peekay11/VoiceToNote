@@ -1,14 +1,17 @@
-import { useState } from 'react'
+
 
 import './App.css'
-import Searchbar from './Components/Searchbar'
+import SearchBar from "./Components/SearchBar.tsx";
+import NoteCard from "./Components/NoteCard.tsx";
+
 
 function App() {
-  const [count, setCount] = useState(0)
+
 
   return (
     <>
-   <Searchbar></Searchbar>
+<SearchBar></SearchBar>
+        <NoteCard></NoteCard>
     </>
   )
 }

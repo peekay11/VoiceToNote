@@ -1,0 +1,53 @@
+{
+  "notes": [
+    {
+      "title": "Learn Python",
+      "status": "Completed",
+      "todos": [
+        "Watch DSA video on YouTube",
+        "Grind LeetCode"
+      ],
+      "context": "All core assignments are completed. Focus on system design concepts next."
+    },
+    {
+      "title": "Web Development Frontend",
+      "status": "In Progress",
+      "todos": [
+        "Build a responsive landing page using Tailwind CSS",
+        "Learn React hooks and state management",
+        "Deploy the project live to Vercel"
+      ],
+      "context": "UI design needs alignment tweaks to fully match the Apple aesthetic."
+    },
+    {
+      "title": "Backend Mastery",
+      "status": "Pending",
+      "todos": [
+        "Set up a Node.js server using Express",
+        "Connect a MongoDB database and design models",
+        "Test REST API endpoints using Postman"
+      ],
+      "context": "Prioritise setting up database indexing for optimized query performance."
+    },
+    {
+      "title": "Cloud Architecture & Security",
+      "status": "In Progress",
+      "todos": [
+        "Review core modules for AWS Certified AI Practitioner exam",
+        "Configure Cloudflare workers for serverless routing",
+        "Set up Firebase security rules for the messaging application layout"
+      ],
+      "context": "Ensure alignment with minimum privilege principles before deploying the serverless stack."
+    },
+    {
+      "title": "DevOps & Automation",
+      "status": "Pending",
+      "todos": [
+        "Debug the failing GitHub Action workflow for the speedtest auto blog post",
+        "Verify domain renewal settings and DNS configurations for WayForward Studios production links",
+        "Complete Week 4 requirements for ALX Professional Foundations"
+      ],
+      "context": "Fix the repository secrets configuration to resolve the main branch compilation errors."
+    }
+  ]
+}
