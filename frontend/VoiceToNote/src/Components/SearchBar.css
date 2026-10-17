@@ -1,7 +1,7 @@
 #header {
     display: flex;
-    background-color: rgba(255, 255, 255, 0.8); /* Apple frosted white */
-    border-bottom: 1px solid #d2d2d7; /* Apple gray divider line */
+    background-color: rgba(255, 255, 255, 0.8);
+    border-bottom: 1px solid #d2d2d7;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     width: 100%;
     align-items: center;
