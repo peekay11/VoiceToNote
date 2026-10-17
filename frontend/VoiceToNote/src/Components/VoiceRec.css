@@ -1,0 +1,27 @@
+.rec-button{
+    display: flex;
+    width: 60px;
+    height: 60px;
+
+
+
+
+
+
+
+
+}   /*border: none;*/
+.rec-button>button{
+    border-radius: 25%;
+    /*border: none;*/
+    padding: 10px;
+    border-width: medium;
+    border-color: red;
+
+
+
+
+
+}
+
+

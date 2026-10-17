@@ -1,9 +1,9 @@
 
-import "./SearchBar.css";
+import "./VoiceRec.css";
 
 const VoiceRec= () => {
     return (
-        <div id="rec-button">
+        <div className="rec-button">
 <button>Rec</button>
         </div>
     )
