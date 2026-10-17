@@ -6,3 +6,8 @@ body{
     padding: 10px 10px;
 
 }
+#top-section{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
