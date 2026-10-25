@@ -1,12 +1,20 @@
-
 import "./SearchBar.css";
 
-const SearchBar = () => {
-    return (
-        <div id="header">
-            <input className="search-bar" type="text"  placeholder='Search for Notes'/>
-        </div>
-    )
+interface SearchBarProps {
+  onSearch?: (query: string) => void;
 }
 
-export default SearchBar
+const SearchBar = ({ onSearch }: SearchBarProps) => {
+  return (
+    <div id="header">
+      <input
+        className="search-bar"
+        type="text"
+        placeholder="Search for Notes"
+        onChange={(e) => onSearch?.(e.target.value)}
+      />
+    </div>
+  );
+};
+
+export default SearchBar;
