@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  VoiceToNote Serverless Backend - Zero idle cost architecture ($0/mo when unused).
-  Uses Cognito, DynamoDB (PAY_PER_REQUEST), S3, Transcribe, EventBridge, API Gateway HTTP API, and Lambda (ARM64).
+  VoiceToNote - Zero idle cost serverless backend.
+  Cognito, DynamoDB on-demand, S3, Transcribe, API Gateway HTTP API, Lambda ARM64.
 
 Globals:
   Function:
@@ -15,19 +15,19 @@ Globals:
       Variables:
         NOTES_TABLE: !Ref NotesTable
         AUDIO_BUCKET: !Ref AudioBucket
+        TRANSCRIBE_REGION: us-east-1
 
 Resources:
+
   # ==========================================
-  # Cognito User Pool (Free up to 50k MAUs)
+  # Cognito User Pool
   # ==========================================
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
       UserPoolName: !Sub ${AWS::StackName}-user-pool
-      AutoVerifiedAttributes:
-        - email
-      UsernameAttributes:
-        - email
+      AutoVerifiedAttributes: [email]
+      UsernameAttributes: [email]
       Policies:
         PasswordPolicy:
           MinimumLength: 8
@@ -47,12 +47,12 @@ Resources:
         - ALLOW_REFRESH_TOKEN_AUTH
 
   # ==========================================
-  # S3 Bucket (With Lifecycle Rule for Audio)
+  # S3 Bucket - NO NotificationConfiguration here
+  # (wired separately via custom resource to avoid circular dependency)
   # ==========================================
   AudioBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub ${AWS::StackName}-audio-${AWS::AccountId}
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
@@ -61,12 +61,12 @@ Resources:
             MaxAge: 3000
       LifecycleConfiguration:
         Rules:
-          - Id: ExpireAudioRecordingsAfter7Days
+          - Id: ExpireAudioAfter7Days
             Status: Enabled
             ExpirationInDays: 7
 
   # ==========================================
-  # DynamoDB Table (PAY_PER_REQUEST - $0 Idle)
+  # DynamoDB Table (PAY_PER_REQUEST = $0 idle)
   # ==========================================
   NotesTable:
     Type: AWS::DynamoDB::Table
@@ -85,35 +85,26 @@ Resources:
           KeyType: RANGE
 
   # ==========================================
-  # HTTP API Gateway (Low cost + Native CORS)
+  # HTTP API Gateway with Cognito JWT Auth
   # ==========================================
   HttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
       CorsConfiguration:
-        AllowOrigins:
-          - '*'
-        AllowHeaders:
-          - Authorization
-          - Content-Type
-        AllowMethods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - OPTIONS
+        AllowOrigins: ['*']
+        AllowHeaders: [Authorization, Content-Type]
+        AllowMethods: [GET, POST, PUT, DELETE, OPTIONS]
       Auth:
         DefaultAuthorizer: CognitoAuthorizer
         Authorizers:
           CognitoAuthorizer:
             IdentitySource: "$request.header.Authorization"
             JwtConfiguration:
-              audience:
-                - !Ref UserPoolClient
+              audience: [!Ref UserPoolClient]
               issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
 
   # ==========================================
-  # Lambda Functions
+  # Lambda: Presigned S3 Upload URL
   # ==========================================
   GetUploadUrlFunction:
     Type: AWS::Serverless::Function
@@ -121,8 +112,10 @@ Resources:
       CodeUri: backend/src/
       Handler: get_upload_url.lambda_handler
       Policies:
-        - S3WritePolicy:
-            BucketName: !Sub ${AWS::StackName}-audio-${AWS::AccountId}
+        - Statement:
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub ${AudioBucket.Arn}/*
       Events:
         ApiEvent:
           Type: HttpApi
@@ -131,59 +124,144 @@ Resources:
             Path: /upload-url
             Method: post
 
+  # ==========================================
+  # Lambda: Start Transcribe on S3 upload
+  # (No SAM S3 Event - triggered via S3 notification custom resource below)
+  # ==========================================
   StartTranscribeFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: backend/src/
       Handler: start_transcription.lambda_handler
       Policies:
-        - S3ReadPolicy:
-            BucketName: !Sub ${AWS::StackName}-audio-${AWS::AccountId}
+        - Statement:
+            - Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub ${AudioBucket.Arn}/*
+            - Effect: Allow
+              Action: transcribe:StartTranscriptionJob
+              Resource: '*'
+
+  # Allow S3 to invoke StartTranscribeFunction
+  StartTranscribeFunctionS3Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt StartTranscribeFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  # ==========================================
+  # Custom Resource: Wire S3 -> Lambda notification
+  # ==========================================
+  S3NotificationSetupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      InlineCode: |
+        import boto3, json, urllib.request
+
+        def handler(event, context):
+            s3 = boto3.client('s3')
+            bucket = event['ResourceProperties']['BucketName']
+            lambda_arn = event['ResourceProperties']['LambdaArn']
+            status = 'SUCCESS'
+            reason = ''
+            try:
+                if event['RequestType'] in ('Create', 'Update'):
+                    s3.put_bucket_notification_configuration(
+                        Bucket=bucket,
+                        NotificationConfiguration={
+                            'LambdaFunctionConfigurations': [{
+                                'LambdaFunctionArn': lambda_arn,
+                                'Events': ['s3:ObjectCreated:*'],
+                                'Filter': {
+                                    'Key': {
+                                        'FilterRules': [
+                                            {'Name': 'prefix', 'Value': 'audio/'}
+                                        ]
+                                    }
+                                }
+                            }]
+                        }
+                    )
+                elif event['RequestType'] == 'Delete':
+                    try:
+                        s3.put_bucket_notification_configuration(
+                            Bucket=bucket,
+                            NotificationConfiguration={}
+                        )
+                    except Exception:
+                        pass
+            except Exception as e:
+                status = 'FAILED'
+                reason = str(e)
+
+            body = json.dumps({
+                'Status': status,
+                'Reason': reason,
+                'PhysicalResourceId': f"{bucket}-notification",
+                'StackId': event['StackId'],
+                'RequestId': event['RequestId'],
+                'LogicalResourceId': event['LogicalResourceId'],
+                'Data': {}
+            }).encode()
+            req = urllib.request.Request(
+                event['ResponseURL'],
+                data=body,
+                headers={'Content-Type': ''},
+                method='PUT'
+            )
+            urllib.request.urlopen(req)
+      Handler: index.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      Policies:
         - Statement:
             - Effect: Allow
               Action:
-                - transcribe:StartTranscriptionJob
-              Resource: '*'
-      Events:
-        AudioUploaded:
-          Type: S3
-          Properties:
-            Bucket: !Ref AudioBucket
-            Events: s3:ObjectCreated:*
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: audio/
+                - s3:PutBucketNotification
+                - s3:GetBucketNotification
+              Resource: !GetAtt AudioBucket.Arn
 
+  S3NotificationSetup:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: StartTranscribeFunctionS3Permission
+    Properties:
+      ServiceToken: !GetAtt S3NotificationSetupFunction.Arn
+      BucketName: !Ref AudioBucket
+      LambdaArn: !GetAtt StartTranscribeFunction.Arn
+
+  # ==========================================
+  # Lambda: Process Transcript + Classify + Save
+  # ==========================================
   ProcessTranscriptFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: backend/src/
       Handler: process_transcript.lambda_handler
       Policies:
-        - S3ReadPolicy:
-            BucketName: !Sub ${AWS::StackName}-audio-${AWS::AccountId}
-        - DynamoDBCrudPolicy:
-            TableName: !Ref NotesTable
         - Statement:
             - Effect: Allow
-              Action:
-                - transcribe:GetTranscriptionJob
+              Action: s3:GetObject
+              Resource: !Sub ${AudioBucket.Arn}/*
+            - Effect: Allow
+              Action: transcribe:GetTranscriptionJob
               Resource: '*'
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotesTable
       Events:
         TranscribeComplete:
           Type: CloudWatchEvent
           Properties:
             Pattern:
-              source:
-                - aws.transcribe
-              detail-type:
-                - Transcribe Job State Change
+              source: [aws.transcribe]
+              detail-type: [Transcribe Job State Change]
               detail:
-                TranscriptionJobStatus:
-                  - COMPLETED
+                TranscriptionJobStatus: [COMPLETED]
 
+  # ==========================================
+  # Lambda: Notes CRUD API
+  # ==========================================
   NotesApiFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -220,7 +298,7 @@ Resources:
 
 Outputs:
   ApiUrl:
-    Description: HTTP API endpoint URL
+    Description: HTTP API URL
     Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
   UserPoolId:
     Description: Cognito User Pool ID
@@ -229,5 +307,5 @@ Outputs:
     Description: Cognito App Client ID
     Value: !Ref UserPoolClient
   AudioBucketName:
-    Description: Audio S3 Bucket Name
+    Description: S3 Audio Bucket
     Value: !Ref AudioBucket

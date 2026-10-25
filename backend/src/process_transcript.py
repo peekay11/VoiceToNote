@@ -7,6 +7,9 @@ s3_client = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
 NOTES_TABLE = os.environ.get("NOTES_TABLE")
 
+# Transcribe events arrive via EventBridge regardless of region
+transcribe_client = boto3.client("transcribe", region_name="us-east-1")
+
 def classify_note(text: str) -> str:
     lower_text = text.lower()
     # Check if phrase represents a plan vs completed task
