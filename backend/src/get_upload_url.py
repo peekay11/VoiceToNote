@@ -2,8 +2,17 @@ import json
 import os
 import uuid
 import boto3
+from botocore.client import Config
 
-s3_client = boto3.client("s3")
+# Explicitly configure the region and SigV4 to force correct regional URLs
+s3_client = boto3.client(
+    "s3",
+    region_name=os.environ.get("AWS_REGION", "af-south-1"),
+    config=Config(
+        signature_version="s3v4",
+        s3={'addressing_style': 'virtual'}
+    )
+)
 AUDIO_BUCKET = os.environ.get("AUDIO_BUCKET")
 
 def lambda_handler(event, context):
@@ -23,11 +32,7 @@ def lambda_handler(event, context):
             Params={
                 "Bucket": AUDIO_BUCKET,
                 "Key": s3_key,
-                "ContentType": f"audio/{file_extension}",
-                "Metadata": {
-                    "user-id": user_id,
-                    "note-id": note_id,
-                },
+                "ContentType": "audio/webm", # Hardcoded to match the frontend fix
             },
             ExpiresIn=300,
         )

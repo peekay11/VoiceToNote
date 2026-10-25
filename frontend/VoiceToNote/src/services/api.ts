@@ -46,7 +46,7 @@ export async function uploadAudioToS3(uploadUrl: string, blob: Blob): Promise<vo
   const res = await fetch(uploadUrl, {
     method: "PUT",
     headers: {
-      "Content-Type": blob.type || "audio/webm",
+      "Content-Type": "audio/webm", // ✅ Hardcoded to match the backend signature
     },
     body: blob,
   });
