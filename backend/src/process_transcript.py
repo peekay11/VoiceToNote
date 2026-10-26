@@ -1,6 +1,7 @@
 import json
 import os
 import datetime
+import urllib.request
 import boto3
 
 s3_client = boto3.client("s3")
@@ -22,19 +23,26 @@ def lambda_handler(event, context):
     job_name = detail.get("TranscriptionJobName", "")
 
     # Job name format: VoiceNote_<userId>_<noteId>
-    parts = job_name.split("_")
+    # userId and noteId are UUIDs (hyphens only), so splitting on _ is safe,
+    # but use maxsplit=2 to be defensive.
+    parts = job_name.split("_", 2)
     if len(parts) < 3:
         return {"statusCode": 400, "body": "Invalid job name"}
 
     user_id = parts[1]
     note_id = parts[2]
 
-    # Read transcript from S3
-    bucket = os.environ.get("AUDIO_BUCKET")
-    transcript_key = f"transcripts/{user_id}/{note_id}.json"
+    # Fetch the transcript URI from Transcribe (service-managed bucket, us-east-1)
+    job = transcribe_client.get_transcription_job(TranscriptionJobName=job_name)
+    job_detail = job["TranscriptionJob"]
+    transcript_uri = job_detail["Transcript"]["TranscriptFileUri"]
 
-    obj = s3_client.get_object(Bucket=bucket, Key=transcript_key)
-    body = json.loads(obj["Body"].read().decode("utf-8"))
+    # Derive the actual audio extension from the original media URI
+    media_uri = job_detail.get("Media", {}).get("MediaFileUri", "")
+    audio_ext = media_uri.rsplit(".", 1)[-1] if "." in media_uri else "webm"
+
+    with urllib.request.urlopen(transcript_uri) as response:
+        body = json.loads(response.read().decode("utf-8"))
 
     results = body.get("results", {})
     transcripts = results.get("transcripts", [])
@@ -51,7 +59,7 @@ def lambda_handler(event, context):
         "status": status,
         "createdAt": now,
         "updatedAt": now,
-        "audioKey": f"audio/{user_id}/{note_id}.webm",
+        "audioKey": f"audio/{user_id}/{note_id}.{audio_ext}",
     }
     table.put_item(Item=item)
 

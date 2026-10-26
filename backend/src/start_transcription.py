@@ -28,8 +28,9 @@ def lambda_handler(event, context):
             Media={"MediaFileUri": file_uri},
             MediaFormat=media_format,
             LanguageCode="en-US",
-            OutputBucketName=bucket,
-            OutputKey=f"transcripts/{user_id}/{note_id}.json",
+            # OutputBucketName intentionally omitted — Transcribe stores output
+            # in a service-managed bucket in us-east-1. We fetch the result URL
+            # via GetTranscriptionJob in process_transcript.py.
             Tags=[
                 {"Key": "UserId", "Value": user_id},
                 {"Key": "NoteId", "Value": note_id},
