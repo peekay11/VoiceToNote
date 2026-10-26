@@ -5,11 +5,22 @@ import VoiceRec from "../Components/VoiceRec.tsx";
 import NoteCard, { type NoteItem } from "../Components/NoteCard.tsx";
 import { fetchNotes, deleteNote, type Note } from "../services/api.ts";
 import { useAuth } from "../context/AuthContext.tsx";
+import { useTheme } from "../context/ThemeContext.tsx";
 import notesFallback from "../Components/Notes.json";
+import {
+  RiMoonLine,
+  RiSunLine,
+  RiLogoutBoxLine,
+  RiDeleteBin6Line,
+  RiTimeLine,
+  RiCheckboxCircleLine,
+} from "react-icons/ri";
+import "./NotesPage.css";
 
 function transformNote(note: Note): NoteItem {
   const words = (note.text || "").trim().split(/\s+/);
-  const title = words.length > 5 ? words.slice(0, 5).join(" ") + "..." : words.join(" ") || "Voice Note";
+  const title =
+    words.length > 5 ? words.slice(0, 5).join(" ") + "..." : words.join(" ") || "Voice Note";
   return {
     id: note.noteId,
     title,
@@ -26,6 +37,7 @@ const NotesPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const loadNotes = useCallback(async () => {
     try {
@@ -60,10 +72,12 @@ const NotesPage = () => {
     }
   }, []);
 
-  useEffect(() => { loadNotes(); }, [loadNotes]);
+  useEffect(() => {
+    loadNotes();
+  }, [loadNotes]);
 
   const handleDelete = async (e: React.MouseEvent, noteId: string) => {
-    e.preventDefault(); // prevent Link navigation
+    e.preventDefault();
     if (!window.confirm("Delete this note?")) return;
     try {
       await deleteNote(noteId);
@@ -82,123 +96,125 @@ const NotesPage = () => {
     );
   });
 
-  const planned = filteredNotes.filter((n) => n.status.toLowerCase() !== "done" && n.status.toLowerCase() !== "completed");
-  const done = filteredNotes.filter((n) => n.status.toLowerCase() === "done" || n.status.toLowerCase() === "completed");
+  const planned = filteredNotes.filter(
+    (n) => n.status.toLowerCase() !== "done" && n.status.toLowerCase() !== "completed"
+  );
+  const done = filteredNotes.filter(
+    (n) => n.status.toLowerCase() === "done" || n.status.toLowerCase() === "completed"
+  );
 
   return (
-    <>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <div>
-          <span style={{ fontSize: "14px", color: "#64748b" }}>Logged in as: </span>
-          <strong>{user?.email}</strong>
+    <div className="notes-page">
+      {/* Navbar */}
+      <header className="navbar">
+        <div className="navbar-brand">
+          <span className="brand-dot" />
+          <span className="brand-name">VoiceToNote</span>
         </div>
-        <button
-          onClick={logout}
-          style={{
-            background: "transparent",
-            border: "1px solid #cbd5e1",
-            padding: "6px 12px",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontSize: "13px",
-            color: "#475569",
-          }}
-        >
-          Sign Out
-        </button>
-      </div>
+        <div className="navbar-actions">
+          <span className="navbar-user">{user?.email}</span>
+          <button
+            className="icon-btn"
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <RiSunLine size={18} /> : <RiMoonLine size={18} />}
+          </button>
+          <button className="icon-btn icon-btn--danger" onClick={logout} title="Sign out">
+            <RiLogoutBoxLine size={18} />
+          </button>
+        </div>
+      </header>
 
-      {/* Record + Search */}
-      <div id="top-section">
+      {/* Search + Record toolbar */}
+      <div className="toolbar">
         <SearchBar onSearch={setSearchQuery} />
-        <VoiceRec onUploadSuccess={() => {
-          setTimeout(loadNotes, 4000);
-          setTimeout(loadNotes, 8000);
-        }} />
+        <VoiceRec
+          onUploadSuccess={() => {
+            setTimeout(loadNotes, 4000);
+            setTimeout(loadNotes, 8000);
+          }}
+        />
       </div>
 
-      {loading && <p style={{ color: "#64748b", textAlign: "center", marginTop: "20px" }}>Loading notes...</p>}
-
-      {/* Planned Column */}
-      {planned.length > 0 && (
-        <section style={{ marginTop: "32px" }}>
-          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#2563eb", marginBottom: "12px" }}>
-            📋 Planned ({planned.length})
-          </h2>
-          <div id="notes" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {planned.map((note) => (
-              <div key={note.id} style={{ position: "relative" }}>
-                <Link to={`/note/${note.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <NoteCard note={note} />
-                </Link>
-                {isLiveData && (
-                  <button
-                    onClick={(e) => handleDelete(e, note.id)}
-                    title="Delete note"
-                    style={deleteChipStyle}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
+      <main className="notes-main">
+        {loading && (
+          <div className="loading-state">
+            <span className="loading-spinner" />
+            <p>Loading notes...</p>
           </div>
-        </section>
-      )}
+        )}
 
-      {/* Done Column */}
-      {done.length > 0 && (
-        <section style={{ marginTop: "32px" }}>
-          <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#16a34a", marginBottom: "12px" }}>
-            ✅ Done ({done.length})
-          </h2>
-          <div id="notes" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {done.map((note) => (
-              <div key={note.id} style={{ position: "relative" }}>
-                <Link to={`/note/${note.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <NoteCard note={note} />
-                </Link>
-                {isLiveData && (
-                  <button
-                    onClick={(e) => handleDelete(e, note.id)}
-                    title="Delete note"
-                    style={deleteChipStyle}
+        {/* Planned section */}
+        {planned.length > 0 && (
+          <section className="notes-section">
+            <h2 className="section-header section-header--planned">
+              <RiTimeLine size={14} />
+              Planned <span className="count-badge">{planned.length}</span>
+            </h2>
+            <div className="notes-grid">
+              {planned.map((note) => (
+                <div key={note.id} className="note-card-wrapper">
+                  <Link
+                    to={`/note/${note.id}`}
+                    style={{ textDecoration: "none", color: "inherit", display: "block", height: "100%" }}
                   >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+                    <NoteCard note={note} />
+                  </Link>
+                  {isLiveData && (
+                    <button
+                      className="delete-btn"
+                      onClick={(e) => handleDelete(e, note.id)}
+                      title="Delete note"
+                    >
+                      <RiDeleteBin6Line size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-      {!loading && filteredNotes.length === 0 && (
-        <p style={{ color: "#94a3b8", textAlign: "center", marginTop: "40px" }}>
-          No notes yet. Press <strong>Rec</strong> to record your first voice note!
-        </p>
-      )}
-    </>
+        {/* Done section */}
+        {done.length > 0 && (
+          <section className="notes-section">
+            <h2 className="section-header section-header--done">
+              <RiCheckboxCircleLine size={14} />
+              Done <span className="count-badge count-badge--done">{done.length}</span>
+            </h2>
+            <div className="notes-grid">
+              {done.map((note) => (
+                <div key={note.id} className="note-card-wrapper">
+                  <Link
+                    to={`/note/${note.id}`}
+                    style={{ textDecoration: "none", color: "inherit", display: "block", height: "100%" }}
+                  >
+                    <NoteCard note={note} />
+                  </Link>
+                  {isLiveData && (
+                    <button
+                      className="delete-btn"
+                      onClick={(e) => handleDelete(e, note.id)}
+                      title="Delete note"
+                    >
+                      <RiDeleteBin6Line size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!loading && filteredNotes.length === 0 && (
+          <div className="empty-state">
+            <p>No notes yet. Press <strong>Rec</strong> to record your first voice note!</p>
+          </div>
+        )}
+      </main>
+    </div>
   );
-};
-
-const deleteChipStyle: React.CSSProperties = {
-  position: "absolute",
-  top: "10px",
-  right: "10px",
-  background: "#fee2e2",
-  color: "#b91c1c",
-  border: "none",
-  borderRadius: "50%",
-  width: "24px",
-  height: "24px",
-  fontSize: "12px",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  lineHeight: 1,
 };
 
 export default NotesPage;

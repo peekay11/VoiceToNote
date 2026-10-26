@@ -1,101 +1,268 @@
-/* Master page canvas setting a wide text layout */
-.notes-detail-container {
-    max-width: 800px;
-    margin: 60px auto;
-    padding: 0 40px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: transparent;
+.detail-page {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
 }
 
-/* Stripped back navigation */
-.detail-nav {
-    margin-bottom: 48px;
+/* ── Navbar ── */
+.detail-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-header);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
-.back-link {
-    text-decoration: none;
-    color: #8e8e93;
-    font-size: 1rem;
-    font-weight: 400;
-    transition: color 0.15s ease;
+.detail-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
 }
 
-.back-link:hover {
-    color: #1d1d1f;
+.detail-back-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
 }
 
-/* Plain document layout replacing the bulky box card block */
-.note-detailed {
-    display: flex;
-    flex-direction: column;
-    gap: 32px;
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
-/* Elegant, flat minimal text status indicator */
-.note-detailed .status {
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin: 0;
-    color: #8e8e93;
+.icon-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
 }
 
-/* Minimalist typographic header block */
-.note-detailed .title {
-    font-size: 3rem;
-    font-weight: 700;
-    color: #1d1d1f;
-    margin: 0;
-    letter-spacing: -0.5px;
-    line-height: 1.15;
+/* ── Content ── */
+.detail-content {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 52px 24px 80px;
+  width: 100%;
 }
 
-/* Section headings rely on clean spacing instead of underlines */
-.section-title {
-    font-size: 0.9rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #8e8e93;
-    margin: 12px 0 0 0;
+.detail-loading,
+.detail-not-found {
+  text-align: center;
+  padding: 80px 24px;
+  color: var(--text-muted);
+  font-size: 15px;
 }
 
-/* Clean, flat Todo layout items block */
-.todo-list {
-    list-style-type: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
+/* ── Status ── */
+.detail-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
-.todo-item-label {
-    display: flex;
-    align-items: flex-start;
-    font-size: 1.15rem;
-    line-height: 1.4;
-    color: #1d1d1f;
-    cursor: pointer;
-    width: 100%;
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 4px 11px;
+  border-radius: 20px;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--accent);
 }
 
-/* Standard native sleek checkbox scale formatting */
-.todo-checkbox {
-    width: 18px;
-    height: 18px;
-    margin-top: 2px;
-    margin-right: 14px;
-    cursor: pointer;
-    accent-color: #1d1d1f;
+.status-pill--done {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--accent-green);
 }
 
-/* Deep context text formatting mimics raw editor text blocks */
-.context-text {
-    font-size: 1.2rem;
-    line-height: 1.65;
-    color: #1d1d1f;
-    margin: 0;
-    white-space: pre-line;
+.toggle-status-btn {
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--border-input);
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+.toggle-status-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+/* ── Typography ── */
+.detail-title {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 10px 0;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+}
+
+.detail-date {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 40px 0;
+}
+
+.detail-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-muted);
+  margin: 36px 0 14px 0;
+}
+
+/* ── Todos ── */
+.detail-todo-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-todo-item label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 1rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+.detail-todo-item input[type="checkbox"] {
+  margin-top: 3px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ── Transcript ── */
+.detail-context {
+  font-size: 1.1rem;
+  line-height: 1.75;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: pre-line;
+}
+
+/* ── Edit ── */
+.detail-edit-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-textarea {
+  width: 100%;
+  font-size: 1rem;
+  line-height: 1.6;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-input);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  resize: vertical;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.detail-textarea:focus {
+  border-color: var(--accent);
+}
+
+.detail-edit-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ── Action buttons ── */
+.detail-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 44px;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.action-btn:active { transform: scale(0.97); }
+.action-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.action-btn--primary {
+  background: var(--accent);
+  color: white;
+}
+.action-btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.action-btn--ghost {
+  background: var(--bg-card-hover);
+  color: var(--text-secondary);
+}
+.action-btn--ghost:hover:not(:disabled) { color: var(--text-primary); }
+
+.action-btn--danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+.action-btn--danger:hover:not(:disabled) { opacity: 0.8; }
+
+/* ── Error ── */
+.detail-error {
+  color: var(--danger-text);
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .detail-content { padding: 32px 16px 60px; }
+  .detail-title   { font-size: 1.8rem; }
 }

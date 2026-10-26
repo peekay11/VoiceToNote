@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import "./VoiceRec.css";
 import { getUploadUrl, uploadAudioToS3 } from "../services/api.ts";
+import { RiMicLine, RiStopCircleLine, RiUploadCloud2Line } from "react-icons/ri";
 
 interface VoiceRecProps {
   onUploadSuccess?: () => void;
@@ -22,9 +23,7 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
 
       chunksRef.current = [];
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
+        if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
       mediaRecorder.onstop = async () => {
@@ -37,11 +36,9 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
       mediaRecorder.start();
       setRecording(true);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setStatusMessage(`Microphone error: ${err.message}`);
-      } else {
-        setStatusMessage("Failed to access microphone");
-      }
+      setStatusMessage(
+        err instanceof Error ? `Microphone error: ${err.message}` : "Failed to access microphone"
+      );
     }
   };
 
@@ -57,44 +54,38 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
       setUploading(true);
       setStatusMessage("Getting upload URL...");
       const { uploadUrl } = await getUploadUrl("webm");
-
-      setStatusMessage("Uploading audio to cloud...");
+      setStatusMessage("Uploading...");
       await uploadAudioToS3(uploadUrl, audioBlob);
-
-      setStatusMessage("Recording uploaded! Processing note in AWS...");
-      if (onUploadSuccess) {
-        onUploadSuccess();
-      }
+      setStatusMessage("Processing in AWS...");
+      if (onUploadSuccess) onUploadSuccess();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setStatusMessage(`Upload failed: ${err.message}`);
-      } else {
-        setStatusMessage("Failed to upload audio");
-      }
+      setStatusMessage(
+        err instanceof Error ? `Upload failed: ${err.message}` : "Failed to upload audio"
+      );
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="rec-button">
+    <div className="voicerec">
       <button
         type="button"
+        className={`rec-btn${recording ? " rec-btn--recording" : ""}${uploading ? " rec-btn--uploading" : ""}`}
         onClick={recording ? stopRecording : startRecording}
         disabled={uploading}
-        style={{
-          backgroundColor: recording ? "#ef4444" : "#2563eb",
-          color: "white",
-          cursor: uploading ? "not-allowed" : "pointer",
-        }}
+        title={recording ? "Stop recording" : "Start recording"}
       >
-        {uploading ? "Saving..." : recording ? "Stop" : "Rec"}
+        {uploading ? (
+          <RiUploadCloud2Line size={18} />
+        ) : recording ? (
+          <RiStopCircleLine size={18} />
+        ) : (
+          <RiMicLine size={18} />
+        )}
+        <span>{uploading ? "Saving..." : recording ? "Stop" : "Rec"}</span>
       </button>
-      {statusMessage && (
-        <span style={{ fontSize: "12px", color: "#64748b", marginLeft: "10px" }}>
-          {statusMessage}
-        </span>
-      )}
+      {statusMessage && <span className="rec-status">{statusMessage}</span>}
     </div>
   );
 };

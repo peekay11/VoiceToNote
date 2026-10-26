@@ -1,4 +1,5 @@
 import "./NoteCard.css";
+import { RiTimeLine, RiCheckboxCircleLine } from "react-icons/ri";
 
 export interface NoteItem {
   id: string;
@@ -14,26 +15,16 @@ interface NoteProps {
 }
 
 const NoteCard = ({ note }: NoteProps) => {
+  const isDone =
+    note.status.toLowerCase() === "done" || note.status.toLowerCase() === "completed";
   return (
-    <div className="note-card">
-      <h1 className="title">{note.title}</h1>
-      <p className="status" style={{
-        color: note.status.toLowerCase() === "done" || note.status.toLowerCase() === "completed" ? "#16a34a" : "#2563eb"
-      }}>
-        {note.status}
-      </p>
-
-      {note.todos && note.todos.length > 0 && (
-        <ul className="todo-list">
-          {note.todos.map((todo, index) => (
-            <li key={index} className="todo-item">{todo}</li>
-          ))}
-        </ul>
-      )}
-
-      <p className="context-text">
-        {note.context}
-      </p>
+    <div className={`note-card${isDone ? " note-card--done" : ""}`}>
+      <div className="note-card-status">
+        {isDone ? <RiCheckboxCircleLine size={12} /> : <RiTimeLine size={12} />}
+        <span>{note.status}</span>
+      </div>
+      <h2 className="note-card-title">{note.title}</h2>
+      <p className="note-card-context">{note.context}</p>
     </div>
   );
 };
