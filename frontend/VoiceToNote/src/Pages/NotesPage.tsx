@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import SearchBar from "../Components/SearchBar.tsx";
 import VoiceRec from "../Components/VoiceRec.tsx";
 import NoteCard, { type NoteItem } from "../Components/NoteCard.tsx";
+import ProcessingCard from "../Components/ProcessingCard.tsx";
 import { fetchNotes, deleteNote, type Note } from "../services/api.ts";
 import { useAuth } from "../context/AuthContext.tsx";
 import { useTheme } from "../context/ThemeContext.tsx";
@@ -36,6 +37,8 @@ const NotesPage = () => {
   const [isLiveData, setIsLiveData] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [pendingCards, setPendingCards] = useState<string[]>([]);
+  const knownNoteIdsRef = useRef<Set<string>>(new Set());
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
@@ -44,7 +47,16 @@ const NotesPage = () => {
       setLoading(true);
       const apiNotes = await fetchNotes();
       if (apiNotes && apiNotes.length > 0) {
-        setNotes(apiNotes.map(transformNote));
+        const transformed = apiNotes.map(transformNote);
+        // Count how many NEW note IDs arrived — remove that many pending cards
+        const newIds = transformed.filter((n) => !knownNoteIdsRef.current.has(n.id));
+        if (newIds.length > 0) {
+          knownNoteIdsRef.current = new Set(transformed.map((n) => n.id));
+          setPendingCards((prev) => prev.slice(newIds.length));
+        } else {
+          knownNoteIdsRef.current = new Set(transformed.map((n) => n.id));
+        }
+        setNotes(transformed);
         setIsLiveData(true);
       } else {
         const fallback: NoteItem[] = notesFallback.notes.map((n) => ({
@@ -131,6 +143,8 @@ const NotesPage = () => {
         <SearchBar onSearch={setSearchQuery} />
         <VoiceRec
           onUploadSuccess={() => {
+            // Add a processing placeholder card immediately
+            setPendingCards((prev) => [...prev, `pending-${Date.now()}`]);
             setTimeout(loadNotes, 4000);
             setTimeout(loadNotes, 8000);
           }}
@@ -146,13 +160,17 @@ const NotesPage = () => {
         )}
 
         {/* Planned section */}
-        {planned.length > 0 && (
+        {(planned.length > 0 || pendingCards.length > 0) && (
           <section className="notes-section">
             <h2 className="section-header section-header--planned">
               <RiTimeLine size={14} />
-              Planned <span className="count-badge">{planned.length}</span>
+              Planned <span className="count-badge">{planned.length + pendingCards.length}</span>
             </h2>
             <div className="notes-grid">
+              {/* Processing placeholder cards */}
+              {pendingCards.map((id) => (
+                <ProcessingCard key={id} />
+              ))}
               {planned.map((note) => (
                 <div key={note.id} className="note-card-wrapper">
                   <Link

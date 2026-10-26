@@ -1,0 +1,90 @@
+.processing-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  height: 148px;
+  box-sizing: border-box;
+  opacity: 0.6;
+}
+
+/* Shimmer sweep */
+.processing-card-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.06) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.processing-card-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Spinning status row */
+.processing-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+}
+
+.processing-spin {
+  animation: spin 1s linear infinite;
+  color: var(--text-muted);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Skeleton bars */
+.processing-bar {
+  border-radius: 6px;
+  background: var(--border);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.8; }
+}
+
+.processing-bar--title {
+  height: 14px;
+  width: 65%;
+}
+
+.processing-bar--line1 {
+  height: 11px;
+  width: 90%;
+  animation-delay: 0.1s;
+}
+
+.processing-bar--line2 {
+  height: 11px;
+  width: 75%;
+  animation-delay: 0.2s;
+}
