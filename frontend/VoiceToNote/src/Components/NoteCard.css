@@ -17,9 +17,7 @@
   transform: translateY(-2px);
 }
 
-.note-card--done {
-  border-left: 3px solid var(--accent-green);
-}
+
 
 .note-card-status {
   display: flex;
