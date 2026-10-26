@@ -1,8 +1,13 @@
+// Detail page for a single note.
+// Reads the note directly from the local cache — no extra API call needed.
+// After any edit, status change, or delete, the cache is updated immediately.
+
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import notesData from "../Components/Notes.json";
-import { fetchNotes, updateNote, deleteNote, type Note } from "../services/api.ts";
-import { type NoteItem } from "../Components/NoteCard.tsx";
+import { updateNote, deleteNote } from "../services/api.ts";
+import { getCachedNotes, updateCachedNote, removeCachedNote } from "../services/notesCache.ts";
+import { type NoteItem, type TodoItem } from "../Components/NoteCard.tsx";
+import ConfirmModal from "../Components/ConfirmModal.tsx";
 import { useTheme } from "../context/ThemeContext.tsx";
 import {
   RiArrowLeftLine,
@@ -15,74 +20,54 @@ import {
 } from "react-icons/ri";
 import "./NotesDetail.css";
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 const NotesDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
 
   const [note, setNote] = useState<NoteItem | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isLiveNote, setIsLiveNote] = useState(false);
+  const [loadingNote, setLoadingNote] = useState(true);
+
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [actionError, setActionError] = useState("");
 
-  useEffect(() => {
-    async function getNote() {
-      try {
-        const apiNotes = await fetchNotes();
-        const matchedApiNote = apiNotes.find((n: Note) => n.noteId === id);
-        if (matchedApiNote) {
-          const words = (matchedApiNote.text || "").trim().split(/\s+/);
-          const title =
-            words.length > 5 ? words.slice(0, 5).join(" ") + "..." : words.join(" ") || "Voice Note";
-          const noteItem: NoteItem = {
-            id: matchedApiNote.noteId,
-            title,
-            status: matchedApiNote.status,
-            todos: [],
-            context: matchedApiNote.text,
-            createdAt: matchedApiNote.createdAt,
-          };
-          setNote(noteItem);
-          setEditText(matchedApiNote.text);
-          setIsLiveNote(true);
-          setLoading(false);
-          return;
-        }
-      } catch {
-        // fallthrough to local data
-      }
+  // ─── Load note from cache ──────────────────────────────────────────────────
 
-      const fallbackNote = notesData.notes.find((n) => String(n.id) === id);
-      if (fallbackNote) {
-        const noteItem: NoteItem = {
-          id: String(fallbackNote.id),
-          title: fallbackNote.title,
-          status: fallbackNote.status,
-          todos: fallbackNote.todos,
-          context: fallbackNote.context,
-        };
-        setNote(noteItem);
-        setEditText(fallbackNote.context);
-      }
-      setLoading(false);
+  useEffect(() => {
+    const cached = getCachedNotes();
+    const match = cached.find((n) => n.id === id);
+    if (match) {
+      setNote(match);
+      setEditText(match.context);
     }
-    getNote();
+    setLoadingNote(false);
   }, [id]);
 
+  // ─── Handlers ──────────────────────────────────────────────────────────────
+
   const handleSaveEdit = async () => {
-    if (!note || !isLiveNote) return;
+    if (!note) return;
     setSaving(true);
     setActionError("");
     try {
-      const words = editText.trim().split(/\s+/);
-      const newTitle =
-        words.length > 5 ? words.slice(0, 5).join(" ") + "..." : words.join(" ") || "Voice Note";
-      await updateNote(note.id, { text: editText } as Parameters<typeof updateNote>[1]);
-      setNote((prev) => (prev ? { ...prev, title: newTitle, context: editText } : prev));
+      // Backend will clean and re-structure via AI — we get updated fields back
+      const updated = await updateNote(note.id, { text: editText } as Parameters<typeof updateNote>[1]);
+      const changes: Partial<NoteItem> = {
+        title: (updated as unknown as NoteItem & { title?: string }).title || note.title,
+        context: (updated as unknown as NoteItem & { summary?: string }).summary || editText,
+        todos: ((updated as unknown as NoteItem & { todos?: string[] }).todos || []).map((t: string | TodoItem) => ({
+          text: typeof t === "string" ? t : t.text,
+          done: typeof t === "string" ? false : t.done ?? false,
+        })),
+      };
+      updateCachedNote(note.id, changes);
+      setNote((prev) => (prev ? { ...prev, ...changes } : prev));
       setEditing(false);
     } catch {
       setActionError("Failed to save changes. Please try again.");
@@ -92,11 +77,12 @@ const NotesDetail = () => {
   };
 
   const handleToggleStatus = async () => {
-    if (!note || !isLiveNote) return;
+    if (!note) return;
     const newStatus = note.status === "Done" ? "Planned" : "Done";
     setActionError("");
     try {
       await updateNote(note.id, { status: newStatus } as Parameters<typeof updateNote>[1]);
+      updateCachedNote(note.id, { status: newStatus });
       setNote((prev) => (prev ? { ...prev, status: newStatus } : prev));
     } catch {
       setActionError("Failed to update status. Please try again.");
@@ -104,12 +90,12 @@ const NotesDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!note || !isLiveNote) return;
-    if (!window.confirm("Delete this note? This cannot be undone.")) return;
+    if (!note) return;
     setDeleting(true);
     setActionError("");
     try {
       await deleteNote(note.id);
+      removeCachedNote(note.id);
       navigate("/");
     } catch {
       setActionError("Failed to delete note. Please try again.");
@@ -117,14 +103,27 @@ const NotesDetail = () => {
     }
   };
 
-  if (loading)
+  // Toggles a single todo's done state locally (UI only — not persisted to API)
+  const handleToggleTodo = (index: number) => {
+    if (!note) return;
+    const updatedTodos = note.todos.map((todo, i) =>
+      i === index ? { ...todo, done: !todo.done } : todo
+    );
+    updateCachedNote(note.id, { todos: updatedTodos });
+    setNote((prev) => (prev ? { ...prev, todos: updatedTodos } : prev));
+  };
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
+  if (loadingNote) {
     return (
       <div className="detail-page">
         <div className="detail-loading">Loading note...</div>
       </div>
     );
+  }
 
-  if (!note)
+  if (!note) {
     return (
       <div className="detail-page">
         <button className="detail-back-btn" onClick={() => navigate("/")}>
@@ -133,12 +132,23 @@ const NotesDetail = () => {
         <p className="detail-not-found">Note not found.</p>
       </div>
     );
+  }
 
   const isDone = note.status === "Done";
 
   return (
     <div className="detail-page">
-      {/* Navbar */}
+      {/* Delete confirmation modal */}
+      {showDeleteModal && (
+        <ConfirmModal
+          message="Delete this note? This cannot be undone."
+          confirmLabel={deleting ? "Deleting..." : "Delete"}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
+
+      {/* Top navbar */}
       <header className="detail-navbar">
         <button className="detail-back-btn" onClick={() => navigate("/")}>
           <RiArrowLeftLine size={16} /> Back
@@ -153,17 +163,15 @@ const NotesDetail = () => {
       </header>
 
       <div className="detail-content">
-        {/* Status row */}
+        {/* Status badge + toggle button */}
         <div className="detail-status-row">
           <span className={`status-pill${isDone ? " status-pill--done" : ""}`}>
             {isDone ? <RiCheckLine size={12} /> : <RiTimeLine size={12} />}
             {note.status}
           </span>
-          {isLiveNote && (
-            <button className="toggle-status-btn" onClick={handleToggleStatus}>
-              Mark as {isDone ? "Planned" : "Done"}
-            </button>
-          )}
+          <button className="toggle-status-btn" onClick={handleToggleStatus}>
+            Mark as {isDone ? "Planned" : "Done"}
+          </button>
         </div>
 
         <h1 className="detail-title">{note.title}</h1>
@@ -178,22 +186,28 @@ const NotesDetail = () => {
           </p>
         )}
 
+        {/* Todos with radio buttons */}
         {note.todos.length > 0 && (
           <>
             <h3 className="detail-section-title">Tasks</h3>
             <ul className="detail-todo-list">
               {note.todos.map((todo, index) => (
-                <li key={index} className="detail-todo-item">
-                  <label>
-                    <input type="checkbox" />
-                    {todo}
-                  </label>
+                <li key={index} className={`detail-todo-item${todo.done ? " detail-todo-item--done" : ""}`}>
+                  <button
+                    className={`todo-radio${todo.done ? " todo-radio--done" : ""}`}
+                    onClick={() => handleToggleTodo(index)}
+                    aria-label={todo.done ? "Mark incomplete" : "Mark complete"}
+                  >
+                    {todo.done && <RiCheckLine size={11} />}
+                  </button>
+                  <span className="todo-text">{todo.text}</span>
                 </li>
               ))}
             </ul>
           </>
         )}
 
+        {/* Cleaned transcript */}
         <h3 className="detail-section-title">Transcript</h3>
 
         {editing ? (
@@ -205,14 +219,18 @@ const NotesDetail = () => {
               rows={8}
             />
             <div className="detail-edit-actions">
-              <button className="action-btn action-btn--primary" onClick={handleSaveEdit} disabled={saving}>
+              <button
+                className="action-btn action-btn--primary"
+                onClick={handleSaveEdit}
+                disabled={saving}
+              >
                 {saving ? "Saving..." : "Save Changes"}
               </button>
               <button
                 className="action-btn action-btn--ghost"
                 onClick={() => {
                   setEditing(false);
-                  setEditText(note.context);
+                  setEditText(note.context); // discard changes
                 }}
               >
                 Cancel
@@ -225,12 +243,17 @@ const NotesDetail = () => {
 
         {actionError && <p className="detail-error">{actionError}</p>}
 
-        {isLiveNote && !editing && (
+        {/* Edit + Delete actions */}
+        {!editing && (
           <div className="detail-actions">
             <button className="action-btn action-btn--primary" onClick={() => setEditing(true)}>
               <RiEditLine size={15} /> Edit
             </button>
-            <button className="action-btn action-btn--danger" onClick={handleDelete} disabled={deleting}>
+            <button
+              className="action-btn action-btn--danger"
+              onClick={() => setShowDeleteModal(true)}
+              disabled={deleting}
+            >
               <RiDeleteBin6Line size={15} />
               {deleting ? "Deleting..." : "Delete"}
             </button>

@@ -1,22 +1,32 @@
-import "./NoteCard.css";
+// Card component that displays a single note in the grid.
+// Used on NotesPage inside a <Link> so clicking the card navigates to the detail page.
+
 import { RiTimeLine, RiCheckboxCircleLine } from "react-icons/ri";
+import "./NoteCard.css";
+
+// NoteItem is the frontend shape — slightly different from the raw API Note type
+export interface TodoItem {
+  text: string;
+  done: boolean;
+}
 
 export interface NoteItem {
   id: string;
   title: string;
   status: string;
-  todos: string[];
+  todos: TodoItem[];
   context: string;
   createdAt?: string;
 }
 
-interface NoteProps {
+interface NoteCardProps {
   note: NoteItem;
 }
 
-const NoteCard = ({ note }: NoteProps) => {
+const NoteCard = ({ note }: NoteCardProps) => {
   const isDone =
     note.status.toLowerCase() === "done" || note.status.toLowerCase() === "completed";
+
   return (
     <div className={`note-card${isDone ? " note-card--done" : ""}`}>
       <div className="note-card-status">

@@ -1,3 +1,6 @@
+// Simple search input. Calls onSearch with the current value on every keystroke.
+// Parent is responsible for filtering the notes list.
+
 import { RiSearchLine } from "react-icons/ri";
 import "./SearchBar.css";
 

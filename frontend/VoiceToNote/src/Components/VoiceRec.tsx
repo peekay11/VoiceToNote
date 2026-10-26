@@ -1,7 +1,10 @@
+// Floating circular record button fixed to the bottom center of the screen.
+// Pressing Rec starts recording. Pressing Stop uploads. Cancel discards the recording.
+
 import React, { useState, useRef } from "react";
-import "./VoiceRec.css";
 import { getUploadUrl, uploadAudioToS3 } from "../services/api.ts";
-import { RiMicLine, RiStopCircleLine, RiUploadCloud2Line } from "react-icons/ri";
+import { RiMicLine, RiStopCircleLine, RiUploadCloud2Line, RiCloseLine } from "react-icons/ri";
+import "./VoiceRec.css";
 
 interface VoiceRecProps {
   onUploadSuccess?: () => void;
@@ -13,43 +16,68 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
   const [statusMessage, setStatusMessage] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // ─── Recording ──────────────────────────────────────────────────────────────
 
   const startRecording = async () => {
     try {
       setStatusMessage("");
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      streamRef.current = stream;
 
-      chunksRef.current = [];
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
-        await handleAudioUpload(audioBlob);
+      // onstop fires for both Save and Cancel — cancelled flag prevents upload
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop()); // release mic
+        if (!cancelledRef.current) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          await uploadAudio(audioBlob);
+        }
+        cancelledRef.current = false;
       };
 
-      mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start();
+      mediaRecorderRef.current = recorder;
+      recorder.start();
       setRecording(true);
-    } catch (err: unknown) {
+    } catch (err) {
       setStatusMessage(
         err instanceof Error ? `Microphone error: ${err.message}` : "Failed to access microphone"
       );
     }
   };
 
+  // Tracks whether the current stop was a cancel (discard) or a save (upload)
+  const cancelledRef = useRef(false);
+
   const stopRecording = () => {
     if (mediaRecorderRef.current && recording) {
+      cancelledRef.current = false; // save mode
       mediaRecorderRef.current.stop();
       setRecording(false);
     }
   };
 
-  const handleAudioUpload = async (audioBlob: Blob) => {
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      cancelledRef.current = true; // discard mode — onstop will skip upload
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+      setStatusMessage("");
+    }
+  };
+
+  // ─── Upload ─────────────────────────────────────────────────────────────────
+
+  const uploadAudio = async (audioBlob: Blob) => {
     try {
       setUploading(true);
       setStatusMessage("Getting upload URL...");
@@ -57,8 +85,8 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
       setStatusMessage("Uploading...");
       await uploadAudioToS3(uploadUrl, audioBlob);
       setStatusMessage("Processing in AWS...");
-      if (onUploadSuccess) onUploadSuccess();
-    } catch (err: unknown) {
+      onUploadSuccess?.();
+    } catch (err) {
       setStatusMessage(
         err instanceof Error ? `Upload failed: ${err.message}` : "Failed to upload audio"
       );
@@ -67,24 +95,41 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
     }
   };
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="voicerec">
+      {/* Cancel button — only visible while recording */}
+      {recording && (
+        <button
+          type="button"
+          className="rec-cancel-btn"
+          onClick={cancelRecording}
+          title="Discard recording"
+        >
+          <RiCloseLine size={16} />
+          <span>Cancel</span>
+        </button>
+      )}
+
+      {/* Main circle button */}
       <button
         type="button"
         className={`rec-btn${recording ? " rec-btn--recording" : ""}${uploading ? " rec-btn--uploading" : ""}`}
         onClick={recording ? stopRecording : startRecording}
         disabled={uploading}
-        title={recording ? "Stop recording" : "Start recording"}
+        title={recording ? "Stop and save" : "Start recording"}
       >
         {uploading ? (
-          <RiUploadCloud2Line size={18} />
+          <RiUploadCloud2Line size={22} />
         ) : recording ? (
-          <RiStopCircleLine size={18} />
+          <RiStopCircleLine size={22} />
         ) : (
-          <RiMicLine size={18} />
+          <RiMicLine size={22} />
         )}
-        <span>{uploading ? "Saving..." : recording ? "Stop" : "Rec"}</span>
+        <span>{uploading ? "Saving" : recording ? "Stop" : "Rec"}</span>
       </button>
+
       {statusMessage && <span className="rec-status">{statusMessage}</span>}
     </div>
   );
