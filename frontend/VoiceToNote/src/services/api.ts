@@ -193,8 +193,9 @@ function fallbackTitle(text: string): string {
 // Converts a raw API note to the NoteItem shape used by the UI.
 // Uses stored title/summary/todos if present (new notes), falls back to derivation for old notes.
 export function apiNoteToNoteItem(apiNote: Note): NoteItem {
-  const title = apiNote.title || fallbackTitle(apiNote.text);
-  const context = apiNote.summary ?? (apiNote.text || "");
+  const title = apiNote.title || fallbackTitle(apiNote.text || "");
+  const summary = typeof apiNote.summary === "string" ? apiNote.summary.trim() : "";
+  const context = summary || (apiNote.text || "");
 
   // API stores todos as plain strings — convert to TodoItem objects for the UI
   const todos: TodoItem[] = (apiNote.todos || []).map((t) => ({

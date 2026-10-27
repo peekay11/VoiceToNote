@@ -4,7 +4,7 @@ Description: >
   VoiceToNote - Zero idle cost serverless backend.
   Cognito, DynamoDB on-demand, S3, Transcribe, API Gateway HTTP API, Lambda ARM64.
 
-Globals:
+  Globals:
   Function:
     Timeout: 30
     MemorySize: 256
@@ -15,7 +15,8 @@ Globals:
       Variables:
         NOTES_TABLE: !Ref NotesTable
         AUDIO_BUCKET: !Ref AudioBucket
-        TRANSCRIBE_REGION: us-east-1
+        TRANSCRIBE_REGION: af-south-1
+        BEDROCK_MODEL_ID: amazon.nova-micro-v1:0
 
 Resources:
 
@@ -64,6 +65,20 @@ Resources:
           - Id: ExpireAudioAfter7Days
             Status: Enabled
             ExpirationInDays: 7
+
+  # Allows AWS Transcribe (running in us-east-1) to read audio files from this af-south-1 bucket
+  AudioBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AudioBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: transcribe.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${AudioBucket.Arn}/*
 
   # ==========================================
   # DynamoDB Table (PAY_PER_REQUEST = $0 idle)
@@ -139,7 +154,9 @@ Resources:
               Action: s3:GetObject
               Resource: !Sub ${AudioBucket.Arn}/*
             - Effect: Allow
-              Action: transcribe:StartTranscriptionJob
+              Action:
+                - transcribe:StartTranscriptionJob
+                - transcribe:TagResource
               Resource: '*'
 
   # Allow S3 to invoke StartTranscribeFunction
@@ -239,6 +256,7 @@ Resources:
     Properties:
       CodeUri: backend/src/
       Handler: process_transcript.lambda_handler
+      Timeout: 60
       Policies:
         - Statement:
             - Effect: Allow
@@ -246,6 +264,9 @@ Resources:
               Resource: !Sub ${AudioBucket.Arn}/*
             - Effect: Allow
               Action: transcribe:GetTranscriptionJob
+              Resource: '*'
+            - Effect: Allow
+              Action: bedrock:InvokeModel
               Resource: '*'
         - DynamoDBCrudPolicy:
             TableName: !Ref NotesTable
@@ -267,9 +288,14 @@ Resources:
     Properties:
       CodeUri: backend/src/
       Handler: notes_api.lambda_handler
+      Timeout: 60
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref NotesTable
+        - Statement:
+            - Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource: '*'
       Events:
         ListNotes:
           Type: HttpApi

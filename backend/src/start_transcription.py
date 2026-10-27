@@ -1,8 +1,10 @@
+import os
 import urllib.parse
 import boto3
 
-# Transcribe is not available in af-south-1, route to us-east-1
-transcribe_client = boto3.client("transcribe", region_name="us-east-1")
+# Use the same region as the bucket so Transcribe can access the audio directly
+TRANSCRIBE_REGION = os.environ.get("TRANSCRIBE_REGION", "af-south-1")
+transcribe_client = boto3.client("transcribe", region_name=TRANSCRIBE_REGION)
 
 def lambda_handler(event, context):
     for record in event.get("Records", []):
