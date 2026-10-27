@@ -103,14 +103,30 @@ const NotesDetail = () => {
     }
   };
 
-  // Toggles a single todo's done state locally (UI only — not persisted to API)
-  const handleToggleTodo = (index: number) => {
+  // Toggles a single todo and auto-moves the note to Done once every task is complete.
+  const handleToggleTodo = async (index: number) => {
     if (!note) return;
+    setActionError("");
+
     const updatedTodos = note.todos.map((todo, i) =>
       i === index ? { ...todo, done: !todo.done } : todo
     );
-    updateCachedNote(note.id, { todos: updatedTodos });
-    setNote((prev) => (prev ? { ...prev, todos: updatedTodos } : prev));
+    const status: "Planned" | "Done" =
+      updatedTodos.length > 0 && updatedTodos.every((todo) => todo.done)
+        ? "Done"
+        : "Planned";
+    const changes = { todos: updatedTodos, status };
+
+    setNote((prev) => (prev ? { ...prev, ...changes } : prev));
+    updateCachedNote(note.id, changes);
+
+    try {
+      await updateNote(note.id, changes);
+    } catch {
+      setNote((prev) => (prev ? { ...prev, todos: note.todos, status: note.status } : prev));
+      updateCachedNote(note.id, { todos: note.todos, status: note.status });
+      setActionError("Failed to update task. Please try again.");
+    }
   };
 
   // ─── Render ────────────────────────────────────────────────────────────────

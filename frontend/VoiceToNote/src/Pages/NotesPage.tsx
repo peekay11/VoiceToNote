@@ -9,8 +9,12 @@ import VoiceRec from "../Components/VoiceRec.tsx";
 import NoteCard, { type NoteItem } from "../Components/NoteCard.tsx";
 import ProcessingCard from "../Components/ProcessingCard.tsx";
 import ConfirmModal from "../Components/ConfirmModal.tsx";
-import { deleteNote, fetchAndCacheNotes } from "../services/api.ts";
-import { getCachedNotes, removeCachedNote } from "../services/notesCache.ts";
+import { deleteNote, fetchAndCacheNotes, updateNote } from "../services/api.ts";
+import {
+  getCachedNotes,
+  removeCachedNote,
+  updateCachedNote,
+} from "../services/notesCache.ts";
 import { useAuth } from "../context/AuthContext.tsx";
 import { useTheme } from "../context/ThemeContext.tsx";
 import {
@@ -195,6 +199,31 @@ const NotesPage = () => {
     }
   };
 
+  const handleToggleTodo = async (noteId: string, index: number) => {
+    const note = notes.find((n) => n.id === noteId);
+    if (!note) return;
+
+    const todos = note.todos.map((todo, i) =>
+      i === index ? { ...todo, done: !todo.done } : todo
+    );
+    const status: "Planned" | "Done" =
+      todos.length > 0 && todos.every((todo) => todo.done) ? "Done" : "Planned";
+    const changes = { todos, status };
+
+    // Update instantly so the card can move between Planned and Done
+    setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, ...changes } : n)));
+    updateCachedNote(noteId, changes);
+
+    try {
+      await updateNote(noteId, changes);
+    } catch {
+      // Roll back if the API call fails
+      setNotes((prev) => prev.map((n) => (n.id === noteId ? note : n)));
+      updateCachedNote(noteId, { todos: note.todos, status: note.status });
+      alert("Failed to update task. Please try again.");
+    }
+  };
+
   const handleUploadSuccess = () => {
     // Add a placeholder card right away while AWS processes the audio
     setPendingCardIds((prev) => {
@@ -317,7 +346,10 @@ const NotesPage = () => {
                     to={`/note/${note.id}`}
                     style={{ textDecoration: "none", color: "inherit", display: "block", height: "100%" }}
                   >
-                    <NoteCard note={note} />
+                    <NoteCard
+                      note={note}
+                      onToggleTodo={(index) => handleToggleTodo(note.id, index)}
+                    />
                   </Link>
                   <button
                     className="delete-btn"
@@ -346,7 +378,10 @@ const NotesPage = () => {
                     to={`/note/${note.id}`}
                     style={{ textDecoration: "none", color: "inherit", display: "block", height: "100%" }}
                   >
-                    <NoteCard note={note} />
+                    <NoteCard
+                      note={note}
+                      onToggleTodo={(index) => handleToggleTodo(note.id, index)}
+                    />
                   </Link>
                   <button
                     className="delete-btn"

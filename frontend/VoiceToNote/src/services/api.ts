@@ -17,7 +17,7 @@ export interface Note {
   text: string;
   title?: string;    // AI-generated topic title
   summary?: string;  // AI-generated one-line summary
-  todos?: string[];  // AI-extracted action items
+  todos?: Array<string | TodoItem>; // AI-extracted action items (objects once toggled)
   status: "Planned" | "Done";
   createdAt: string;
   updatedAt?: string;
