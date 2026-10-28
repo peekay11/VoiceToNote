@@ -1,5 +1,3 @@
-// Stores the current theme (dark/light) and persists it in localStorage.
-// Wrap your app in <ThemeProvider> and call useTheme() anywhere to read or toggle the theme.
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 
@@ -20,7 +18,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     () => (localStorage.getItem(THEME_STORAGE_KEY) as Theme) || "dark"
   );
 
-  // Apply theme to <html> element so CSS variables react to it
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem(THEME_STORAGE_KEY, theme);

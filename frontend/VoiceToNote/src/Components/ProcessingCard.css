@@ -12,7 +12,7 @@
   opacity: 0.6;
 }
 
-/* Shimmer sweep */
+/* Shimmer  */
 .processing-card-shimmer {
   position: absolute;
   inset: 0;
@@ -41,7 +41,7 @@
   z-index: 2;
 }
 
-/* Spinning status row */
+/* Spinning */
 .processing-status {
   display: flex;
   align-items: center;

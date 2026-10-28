@@ -5,7 +5,7 @@
   flex-direction: column;
 }
 
-/* ── Navbar ── */
+
 .detail-navbar {
   display: flex;
   align-items: center;
@@ -60,7 +60,6 @@
   color: var(--text-primary);
 }
 
-/* ── Content ── */
 .detail-content {
   max-width: 760px;
   margin: 0 auto;
@@ -76,7 +75,7 @@
   font-size: 15px;
 }
 
-/* ── Status ── */
+
 .detail-status-row {
   display: flex;
   align-items: center;
@@ -198,7 +197,7 @@
   text-decoration: line-through;
 }
 
-/* ── Transcript ── */
+
 .detail-context {
   font-size: 1.1rem;
   line-height: 1.75;
@@ -207,7 +206,7 @@
   white-space: pre-line;
 }
 
-/* ── Edit ── */
+
 .detail-edit-block {
   display: flex;
   flex-direction: column;
@@ -239,7 +238,7 @@
   gap: 10px;
 }
 
-/* ── Action buttons ── */
+
 .detail-actions {
   display: flex;
   gap: 10px;
@@ -281,14 +280,14 @@
 }
 .action-btn--danger:hover:not(:disabled) { opacity: 0.8; }
 
-/* ── Error ── */
+
 .detail-error {
   color: var(--danger-text);
   font-size: 13px;
   margin-top: 10px;
 }
 
-/* ── Responsive ── */
+
 @media (max-width: 600px) {
   .detail-content { padding: 32px 16px 60px; }
   .detail-title   { font-size: 1.8rem; }

@@ -1,5 +1,3 @@
-// Floating circular record button fixed to the bottom center of the screen.
-// Pressing Rec starts recording. Pressing Stop uploads. Cancel discards the recording.
 
 import React, { useState, useRef } from "react";
 import { getUploadUrl, uploadAudioToS3 } from "../services/api.ts";
@@ -19,7 +17,6 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
   const audioChunksRef = useRef<BlobPart[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // ─── Recording ──────────────────────────────────────────────────────────────
 
   const startRecording = async () => {
     try {
@@ -75,7 +72,6 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
     }
   };
 
-  // ─── Upload ─────────────────────────────────────────────────────────────────
 
   const uploadAudio = async (audioBlob: Blob) => {
     try {
@@ -95,7 +91,6 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
     }
   };
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="voicerec">

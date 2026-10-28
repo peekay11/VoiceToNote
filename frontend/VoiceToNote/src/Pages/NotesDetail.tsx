@@ -1,6 +1,3 @@
-// Detail page for a single note.
-// Reads the note directly from the local cache — no extra API call needed.
-// After any edit, status change, or delete, the cache is updated immediately.
 
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -20,7 +17,6 @@ import {
 } from "react-icons/ri";
 import "./NotesDetail.css";
 
-// ─── Component ────────────────────────────────────────────────────────────────
 
 const NotesDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -37,7 +33,6 @@ const NotesDetail = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [actionError, setActionError] = useState("");
 
-  // ─── Load note from cache ──────────────────────────────────────────────────
 
   useEffect(() => {
     const cached = getCachedNotes();
@@ -49,7 +44,7 @@ const NotesDetail = () => {
     setLoadingNote(false);
   }, [id]);
 
-  // ─── Handlers ──────────────────────────────────────────────────────────────
+
 
   const handleSaveEdit = async () => {
     if (!note) return;
@@ -129,7 +124,7 @@ const NotesDetail = () => {
     }
   };
 
-  // ─── Render ────────────────────────────────────────────────────────────────
+
 
   if (loadingNote) {
     return (
@@ -202,7 +197,6 @@ const NotesDetail = () => {
           </p>
         )}
 
-        {/* Todos with radio buttons */}
         {note.todos.length > 0 && (
           <>
             <h3 className="detail-section-title">Tasks</h3>

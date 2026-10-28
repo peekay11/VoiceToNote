@@ -1,6 +1,3 @@
-// Main page showing all the user's notes split into Planned and Done sections.
-// Strategy: show cached notes instantly on load, then refresh from the API in the background.
-// Cache is updated after every successful fetch, edit, or delete.
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -28,9 +25,7 @@ import {
 } from "react-icons/ri";
 import "./NotesPage.css";
 
-// How often to poll while waiting for a transcription (ms)
 const POLL_INTERVAL = 5000;
-// Give up polling after this many seconds (Transcribe can take up to ~60s)
 const POLL_TIMEOUT = 90_000;
 
 const NotesPage = () => {
@@ -62,7 +57,6 @@ const NotesPage = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  // ─── Data loading ───────────────────────────────────────────────────────────
 
   const refreshFromApi = useCallback(async () => {
     try {
@@ -96,18 +90,14 @@ const NotesPage = () => {
     refreshFromApi().finally(() => setInitialLoading(false));
   }, [refreshFromApi]);
 
-  // Clean up any running poll timer when the component unmounts
   useEffect(() => {
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
   }, []);
 
-  // ─── Polling loop ────────────────────────────────────────────────────────────
 
-  // Schedules the next poll tick. Keeps running until:
-  //   a) A new note appears (pendingCardIds drops to 0), or
-  //   b) The timeout is reached (give up after POLL_TIMEOUT ms)
+
   const schedulePoll = useCallback(
     (pendingCount: number) => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
@@ -139,7 +129,6 @@ const NotesPage = () => {
     [refreshFromApi]
   );
 
-  // ─── Pull-to-refresh ─────────────────────────────────────────────────────────
 
   const PULL_THRESHOLD = 72; // px of drag needed to trigger a refresh
 
@@ -179,7 +168,6 @@ const NotesPage = () => {
     }
   }, [pullDistance, refreshFromApi]);
 
-  // ─── Handlers ───────────────────────────────────────────────────────────────
 
   const handleDelete = async (e: React.MouseEvent, noteId: string) => {
     e.preventDefault(); // prevent Link navigation
@@ -235,7 +223,6 @@ const NotesPage = () => {
     });
   };
 
-  // ─── Filtering ───────────────────────────────────────────────────────────────
 
   const filteredNotes = notes.filter((note) => {
     const query = searchQuery.toLowerCase();
@@ -253,7 +240,6 @@ const NotesPage = () => {
     (note) => note.status.toLowerCase() === "done" || note.status.toLowerCase() === "completed"
   );
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -290,7 +276,6 @@ const NotesPage = () => {
           }}
         />
       </div>
-      {/* Top navbar */}
       <header className="navbar">
         <div className="navbar-brand">
           <span className="brand-dot" />
@@ -311,16 +296,13 @@ const NotesPage = () => {
         </div>
       </header>
 
-      {/* Search toolbar */}
       <div className="toolbar">
         <SearchBar onSearch={setSearchQuery} />
       </div>
 
-      {/* Floating record button — fixed to bottom center */}
       <VoiceRec onUploadSuccess={handleUploadSuccess} />
 
       <main className="notes-main">
-        {/* Only shown on the very first visit before any cache exists */}
         {initialLoading && (
           <div className="loading-state">
             <span className="loading-spinner" />
@@ -328,7 +310,6 @@ const NotesPage = () => {
           </div>
         )}
 
-        {/* Planned section — includes placeholder cards while audio is processing */}
         {(plannedNotes.length > 0 || pendingCardIds.length > 0) && (
           <section className="notes-section">
             <h2 className="section-header section-header--planned">
@@ -364,7 +345,6 @@ const NotesPage = () => {
           </section>
         )}
 
-        {/* Done section */}
         {doneNotes.length > 0 && (
           <section className="notes-section">
             <h2 className="section-header section-header--done">
@@ -396,7 +376,6 @@ const NotesPage = () => {
           </section>
         )}
 
-        {/* Empty state — shown when no notes exist at all */}
         {!initialLoading && filteredNotes.length === 0 && pendingCardIds.length === 0 && (
           <div className="empty-state">
             <p>

@@ -4,7 +4,7 @@
   flex-direction: column;
 }
 
-/* ── Navbar ── */
+
 .navbar {
   position: sticky;
   top: 0;
@@ -78,7 +78,7 @@
   border-color: var(--danger-text);
 }
 
-/* ── Toolbar ── */
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -89,7 +89,7 @@
   width: 100%;
 }
 
-/* ── Main ── */
+
 .notes-main {
   flex: 1;
   max-width: 1200px;
@@ -98,7 +98,7 @@
   width: 100%;
 }
 
-/* ── Section headers ── */
+
 .notes-section {
   margin-top: 32px;
 }
@@ -133,7 +133,7 @@
   color: var(--accent-green);
 }
 
-/* ── Notes grid ── */
+
 .notes-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -167,7 +167,7 @@
   opacity: 1;
 }
 
-/* ── Loading ── */
+
 .loading-state {
   display: flex;
   flex-direction: column;
@@ -189,7 +189,7 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Empty state ── */
+
 .empty-state {
   text-align: center;
   margin-top: 100px;
@@ -197,7 +197,7 @@
   font-size: 15px;
 }
 
-/* ── Responsive ── */
+
 @media (max-width: 960px) {
   .notes-grid { grid-template-columns: repeat(2, 1fr); }
 }
@@ -210,7 +210,7 @@
   .navbar-user { display: none; }
 }
 
-/* ── Pull-to-refresh ── */
+/*  Pull-to-refresh */
 .ptr-indicator {
   position: fixed;
   top: -48px;

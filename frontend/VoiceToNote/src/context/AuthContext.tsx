@@ -1,11 +1,8 @@
-// Stores the logged-in user's tokens and info.
-// Wrap your app in <AuthProvider> and call useAuth() anywhere to access the user.
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { refreshSession } from "../services/cognitoAuth.ts";
 import { clearNotesCache } from "../services/notesCache.ts";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface AuthUser {
   email: string;
@@ -23,13 +20,11 @@ interface AuthContextType {
   refresh: () => Promise<boolean>;
 }
 
-// ─── Context setup ────────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_STORAGE_KEY = "voicetonote_auth";
 
-// ─── Token expiry helpers ─────────────────────────────────────────────────────
 
 // Reads the exp claim from a JWT without any library
 function getTokenExpiry(token: string): number {
@@ -49,7 +44,7 @@ function isExpiringSoon(token: string): boolean {
   return Date.now() / 1000 > expiresAt - 300;
 }
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
+
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -161,7 +156,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

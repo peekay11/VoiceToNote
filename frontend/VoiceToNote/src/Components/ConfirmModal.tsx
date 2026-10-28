@@ -1,5 +1,5 @@
-// Reusable confirmation dialog styled to match the app's design system.
-// Usage: <ConfirmModal message="..." onConfirm={...} onCancel={...} />
+// Reusable confirmation dialog styled to match the app's design
+
 
 import "./ConfirmModal.css";
 

@@ -1,4 +1,4 @@
-/* Floating container fixed to the bottom center of the screen */
+
 .voicerec {
   position: fixed;
   bottom: 32px;
@@ -11,7 +11,7 @@
   z-index: 200;
 }
 
-/* Circle record button */
+
 .rec-btn {
   width: 68px;
   height: 68px;
@@ -65,7 +65,7 @@
   50%       { box-shadow: 0 0 0 14px rgba(220, 38, 38, 0); }
 }
 
-/* Cancel button — appears above the main button while recording */
+
 .rec-cancel-btn {
   display: flex;
   align-items: center;
