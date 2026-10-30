@@ -119,7 +119,7 @@
   color: var(--text-primary);
 }
 
-/* ── Typography ── */
+/* Typography */
 .detail-title {
   font-size: 2.4rem;
   font-weight: 700;
@@ -144,7 +144,7 @@
   margin: 36px 0 14px 0;
 }
 
-/* ── Todos ── */
+/* Todos */
 .detail-todo-list {
   list-style: none;
   padding: 0;

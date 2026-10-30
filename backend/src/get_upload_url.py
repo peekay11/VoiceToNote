@@ -4,7 +4,7 @@ import uuid
 import boto3
 from botocore.client import Config
 
-# Explicitly configure the region and SigV4 to force correct regional URLs
+# Force SigV4 so the presigned URL uses the correct regional endpoint.
 s3_client = boto3.client(
     "s3",
     region_name=os.environ.get("AWS_REGION", "af-south-1"),
@@ -17,7 +17,6 @@ AUDIO_BUCKET = os.environ.get("AUDIO_BUCKET")
 
 def lambda_handler(event, context):
     try:
-        # Extract authenticated user ID from JWT claims
         authorizer = event.get("requestContext", {}).get("authorizer", {}).get("jwt", {})
         claims = authorizer.get("claims", {})
         user_id = claims.get("sub") or claims.get("username") or "anonymous"

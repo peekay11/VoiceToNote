@@ -13,7 +13,6 @@ const ThemeContext = createContext<ThemeContextType>({ theme: "dark", toggleThem
 const THEME_STORAGE_KEY = "vtn_theme";
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load saved theme from localStorage, default to dark
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(THEME_STORAGE_KEY) as Theme) || "dark"
   );

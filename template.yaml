@@ -4,7 +4,7 @@ Description: >
   VoiceToNote - Zero idle cost serverless backend.
   Cognito, DynamoDB on-demand, S3, Transcribe, API Gateway HTTP API, Lambda ARM64.
 
-  Globals:
+Globals:
   Function:
     Timeout: 30
     MemorySize: 256
@@ -20,9 +20,7 @@ Description: >
 
 Resources:
 
-  # ==========================================
   # Cognito User Pool
-  # ==========================================
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
@@ -47,10 +45,8 @@ Resources:
         - ALLOW_USER_PASSWORD_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
 
-  # ==========================================
-  # S3 Bucket - NO NotificationConfiguration here
-  # (wired separately via custom resource to avoid circular dependency)
-  # ==========================================
+  # S3 bucket. Notification configuration is wired separately via a custom
+  # resource to avoid a circular dependency.
   AudioBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -80,9 +76,7 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub ${AudioBucket.Arn}/*
 
-  # ==========================================
-  # DynamoDB Table (PAY_PER_REQUEST = $0 idle)
-  # ==========================================
+  # DynamoDB table (PAY_PER_REQUEST, no idle cost)
   NotesTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -99,9 +93,7 @@ Resources:
         - AttributeName: noteId
           KeyType: RANGE
 
-  # ==========================================
-  # HTTP API Gateway with Cognito JWT Auth
-  # ==========================================
+  # HTTP API Gateway with Cognito JWT auth
   HttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -118,9 +110,7 @@ Resources:
               audience: [!Ref UserPoolClient]
               issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
 
-  # ==========================================
-  # Lambda: Presigned S3 Upload URL
-  # ==========================================
+  # Lambda: presigned S3 upload URL
   GetUploadUrlFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -139,10 +129,8 @@ Resources:
             Path: /upload-url
             Method: post
 
-  # ==========================================
-  # Lambda: Start Transcribe on S3 upload
-  # (No SAM S3 Event - triggered via S3 notification custom resource below)
-  # ==========================================
+  # Lambda: start Transcribe on S3 upload. There is no SAM S3 event here;
+  # it is triggered by the S3 notification custom resource below.
   StartTranscribeFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -168,9 +156,7 @@ Resources:
       Principal: s3.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
 
-  # ==========================================
-  # Custom Resource: Wire S3 -> Lambda notification
-  # ==========================================
+  # Custom resource: wire S3 notification to Lambda
   S3NotificationSetupFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -230,8 +216,6 @@ Resources:
             )
             urllib.request.urlopen(req)
       Handler: index.handler
-      Runtime: python3.12
-      Architectures: [arm64]
       Policies:
         - Statement:
             - Effect: Allow
@@ -248,9 +232,7 @@ Resources:
       BucketName: !Ref AudioBucket
       LambdaArn: !GetAtt StartTranscribeFunction.Arn
 
-  # ==========================================
-  # Lambda: Process Transcript + Classify + Save
-  # ==========================================
+  # Lambda: process transcript, classify and save
   ProcessTranscriptFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -280,9 +262,7 @@ Resources:
               detail:
                 TranscriptionJobStatus: [COMPLETED]
 
-  # ==========================================
-  # Lambda: Notes CRUD API
-  # ==========================================
+  # Lambda: notes CRUD API
   NotesApiFunction:
     Type: AWS::Serverless::Function
     Properties:

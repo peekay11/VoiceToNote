@@ -1,0 +1,476 @@
+================================================================================
+VOICETONOTE — PROJECT FLOW & SERVICES (PRESENTATION NOTES)
+================================================================================
+A fully serverless voice-notes app: speak a note, AWS transcribes it, an LLM
+cleans + structures it, and the note lands automatically in "Planned" or "Done".
+
+Repo layout
+  /template.yaml ............ AWS SAM infrastructure (whole backend as code)
+  /backend/src/*.py ......... 4 Python 3.12 Lambda functions
+  /frontend/VoiceToNote/ .... React + Vite single-page app
+
+
+================================================================================
+1. THE 30-SECOND PITCH
+================================================================================
+"VoiceToNote turns messy voice memos into organized tasks. You press record,
+and within seconds the app gives you a clean title, a one-line summary, an
+auto-cleaned transcript, and a checklist of action items — already sorted into
+Planned and Done. No servers, no idle cost, everything runs on AWS serverless."
+
+Key idea to emphasize in the presentation:
+  - Zero idle cost (pay per request only)
+  - Event-driven / asynchronous pipeline (the user is not kept waiting)
+  - AI does the organisation, not the user
+
+
+================================================================================
+2. HIGH-LEVEL ARCHITECTURE
+================================================================================
+                          ┌──────────────────────────┐
+                          │  Browser (React + Vite)  │
+                          │  MediaRecorder API        │
+                          └────────────┬─────────────┘
+                                       │
+        1. Sign up / sign in ─────────►│ AWS Cognito (REST, no SDK)
+        2. POST /upload-url ──────────►│ API Gateway HTTP API (JWT auth)
+                                       ▼
+                              ┌──────────────────┐
+                              │ Lambda           │
+                              │ get_upload_url   │──► returns presigned S3 PUT URL
+                              └──────────────────┘
+                                       │
+        3. PUT audio/webm directly ───►│ Amazon S3 bucket  (audio/<user>/<note>.webm)
+                                       │   (presigned URL, browser → S3 direct)
+                                       ▼
+                              S3 ObjectCreated event (prefix audio/)
+                                       │
+                              ┌──────────────────┐
+                              │ Lambda           │
+                              │ start_transcription │──► Amazon Transcribe job
+                              └──────────────────┘
+                                       │
+                          Transcribe job finishes
+                                       │
+                     EventBridge / CloudWatch Event
+                     "Transcribe Job State Change: COMPLETED"
+                                       │
+                              ┌──────────────────┐
+                              │ Lambda           │──► downloads transcript JSON
+                              │ process_transcript│──► Amazon Bedrock (LLM)
+                              └────────┬─────────┘     clean + title + summary
+                                       │               + status + todos
+                                       ▼
+                              ┌──────────────────┐
+                              │ Amazon DynamoDB  │  notes table (per user)
+                              └──────────────────┘
+                                       ▲
+        4. App polls GET /notes every 5s │  (Lambda notes_api)
+                          ┌────────────┴─────────────┐
+                          │  API Gateway HTTP API     │◄── GET/PUT/DELETE /notes
+                          └──────────────────────────┘
+
+
+================================================================================
+3. SERVICES USED (AND WHY)
+================================================================================
+FRONTEND
+  React 19 + Vite 8 ........ SPA, fast dev/build
+  React Router 7 ........... /login, /signup, / (notes), /note/:id
+  MediaRecorder API ........ record mic audio in the browser as audio/webm
+  react-icons .............. icon set (Remix Icon)
+  localStorage ............. auth tokens + notes cache (instant load, offline view)
+  oxlint / TypeScript ...... lint + type safety
+  Vitest ................... test runner (CI runs it)
+
+AWS — BACKEND (all defined in template.yaml, Python 3.12, ARM64, 256 MB)
+  Amazon Cognito ........... user accounts, email verification, login, JWTs
+                             - User pool: email as username, auto-verify email
+                             - App client: USER_PASSWORD_AUTH + REFRESH_TOKEN_AUTH
+  Amazon API Gateway ....... HTTP API, Cognito JWT authorizer on every route
+  AWS Lambda (4 functions) . all business logic, no servers
+                             - get_upload_url      (POST /upload-url)
+                             - start_transcription (S3 event)
+                             - process_transcript  (Transcribe-complete event)
+                             - notes_api           (GET/PUT/DELETE /notes)
+  Amazon S3 ................ stores raw audio, CORS enabled, 7-day auto-expiry
+  Amazon Transcribe ........ speech-to-text (en-US)
+  Amazon EventBridge ....... CloudWatch Events rule: Transcribe COMPLETED
+                             triggers process_transcript
+  Amazon Bedrock ........... LLM structuring of the transcript
+                             configured model: amazon.nova-micro-v1:0
+                             (code also has a Claude-style invoke_model path)
+  Amazon DynamoDB .......... notes table, PAY_PER_REQUEST (zero idle cost)
+  CloudFormation Custom Res. wires S3 → Lambda notification without a
+                             circular dependency (S3NotificationSetup)
+
+REGIONS (important talking point — cross-region design)
+  af-south-1 (Cape Town) ... Cognito, API Gateway, Lambda, S3, DynamoDB,
+                             Transcribe
+  us-east-1 (N. Virginia) .. Bedrock (Nova Micro not available in af-south-1)
+  Note: Transcribe writes its output JSON to an AWS-managed bucket; the code
+  fetches the transcript URL via GetTranscriptionJob (no output bucket needed).
+
+TOOLING / DEVOPS
+  AWS SAM .................. infrastructure as code + deploy (sam build/deploy)
+  boto3 .................... AWS SDK inside Lambdas
+  GitHub Actions ........... CI: npm ci → npm run build (type-check) → npm test
+
+
+================================================================================
+4. END-TO-END FLOWS (STEP BY STEP)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+FLOW A — SIGN UP & LOGIN (Cognito, no AWS SDK in the browser)
+────────────────────────────────────────────────────────────────────────────────
+1. User opens /signup, enters email + password.
+2. Frontend calls Cognito REST API directly (cognito-idp.<region>.amazonaws.com)
+   with header X-Amz-Target: AWSCognitoIdentityProviderService.SignUp.
+3. Cognito emails a 6-digit confirmation code.
+4. User enters code → ConfirmSignUp.
+5. /login → InitiateAuth (USER_PASSWORD_AUTH) returns:
+      AccessToken, IdToken, RefreshToken.
+6. AuthContext stores them in localStorage key "voicetonote_auth".
+7. ProtectedRoute allows access to / and /note/:id only if a user exists.
+8. Token lifecycle:
+      - On app load, if IdToken expires within 5 minutes → silent refresh.
+      - Any API 401 → api.ts refreshes once and retries automatically.
+      - Refresh failure → session cleared, "auth:logout" event → /login.
+
+Files: src/services/cognitoAuth.ts, src/context/AuthContext.tsx,
+       src/Components/ProtectedRoute.tsx, src/Pages/LoginPage.tsx,
+       src/Pages/SignupPage.tsx
+
+────────────────────────────────────────────────────────────────────────────────
+FLOW B — RECORD & UPLOAD (browser → API → S3)
+────────────────────────────────────────────────────────────────────────────────
+1. User presses "Rec". VoiceRec calls getUserMedia({ audio: true }).
+2. MediaRecorder records audio/webm chunks in memory.
+3. "Stop" (save) → Blob of chunks. "Cancel" → discard, no upload.
+4. Frontend calls POST /upload-url (Bearer IdToken).
+5. Lambda get_upload_url:
+      - reads userId from JWT claim "sub"
+      - creates noteId = uuid4()
+      - key = audio/<userId>/<noteId>.webm
+      - returns a presigned S3 PUT URL (valid 300 s, SigV4)
+6. Browser PUTs the audio Blob straight to S3 using that URL.
+   (The file never passes through API Gateway/Lambda — cheaper + faster.)
+7. UI shows a "ProcessingCard" placeholder and starts polling.
+
+Files: src/Components/VoiceRec.tsx, src/services/api.ts,
+       backend/src/get_upload_url.py
+
+────────────────────────────────────────────────────────────────────────────────
+FLOW C — ASYNC AI PIPELINE (the "magic" — S3 → Transcribe → Bedrock → DynamoDB)
+────────────────────────────────────────────────────────────────────────────────
+1. S3 ObjectCreated (prefix audio/) invokes start_transcription.
+2. start_transcription parses the key: audio/<userId>/<noteId>.<ext>
+      job name = VoiceNote_<userId>_<noteId>
+      starts an Amazon Transcribe job (en-US, MediaFormat webm/mp3/wav).
+3. Transcribe finishes. EventBridge rule fires on
+   "Transcribe Job State Change: COMPLETED".
+4. process_transcript:
+      a. Rebuilds userId/noteId from the job name.
+      b. GetTranscriptionJob → TranscriptFileUri → downloads JSON.
+      c. Extracts raw text.
+      d. Calls Amazon Bedrock (converse; falls back to invoke_model) with a
+         prompt that returns strict JSON:
+             { title, summary, cleanedText, status, todos[] }
+         Rules: remove filler words, 5-word title, one-sentence summary,
+         "Done" if already completed else "Planned", extract action items.
+      e. If the LLM fails → saves raw text with status "Planned" (graceful
+         degradation, the note still appears).
+      f. Writes the item to DynamoDB with createdAt/updatedAt/audioKey.
+5. Frontend has been polling GET /notes every 5 s (max 90 s). When the new
+   note appears, the placeholder is removed and the real card shows up.
+
+Files: backend/src/start_transcription.py, backend/src/process_transcript.py,
+       src/Pages/NotesPage.tsx (polling)
+
+────────────────────────────────────────────────────────────────────────────────
+FLOW D — VIEW NOTES
+────────────────────────────────────────────────────────────────────────────────
+1. On load, app instantly renders cached notes from localStorage
+   ("voicetonote_notes") so the screen is never blank.
+2. In the background it calls GET /notes.
+3. notes_api queries DynamoDB by userId (partition key) → returns that
+   user's notes only.
+4. UI splits notes into "Planned" and "Done" columns; search filters by
+   title, summary/context, and status; pull-to-refresh on mobile.
+5. Clicking a card opens /note/:id (detail from the same cache).
+
+Files: src/Pages/NotesPage.tsx, src/services/notesCache.ts,
+       backend/src/notes_api.py
+
+────────────────────────────────────────────────────────────────────────────────
+FLOW E — EDIT A NOTE (AI re-runs)
+────────────────────────────────────────────────────────────────────────────────
+1. Detail page → Edit → change transcript text → Save.
+2. PUT /notes/{id} with { text }.
+3. notes_api re-runs the AI structure prompt on the new text and updates
+   text, title, summary, status, todos in one UpdateExpression.
+4. Response is written back to localStorage cache and the screen updates.
+
+────────────────────────────────────────────────────────────────────────────────
+FLOW F — TOGGLE TASKS / STATUS
+────────────────────────────────────────────────────────────────────────────────
+1. Tapping a todo checkbox flips { text, done } optimistically in the UI.
+2. If every todo is done → note status becomes "Done", else "Planned"
+   (auto move between columns).
+3. PUT /notes/{id} with { todos, status } → DynamoDB update.
+4. If the request fails, UI rolls back to the previous state.
+5. Detail page also has a manual "Mark as Done/Planned" toggle.
+
+────────────────────────────────────────────────────────────────────────────────
+FLOW G — DELETE
+────────────────────────────────────────────────────────────────────────────────
+1. Delete icon → ConfirmModal.
+2. DELETE /notes/{id} → notes_api deletes the DynamoDB item for that user.
+3. Cache entry removed, card disappears. Audio file itself expires from S3
+   after 7 days (lifecycle rule).
+
+────────────────────────────────────────────────────────────────────────────────
+FLOW H — AUTH REFRESH (resilience)
+────────────────────────────────────────────────────────────────────────────────
+apiFetch() wraps every request:
+  401 → refreshSession(refreshToken) → retry once with new IdToken
+  refresh fails → clear localStorage, fire "auth:logout", redirect to login.
+
+
+================================================================================
+5. API REFERENCE (single HTTP API, Cognito JWT required)
+================================================================================
+POST   /upload-url          body { extension } → { uploadUrl, noteId, key }
+GET    /notes               → [ note, ... ]             (current user only)
+GET    /notes/{id}          → note | 404
+PUT    /notes/{id}          body { text?, status?, todos? } → updated note
+DELETE /notes/{id}          → { message }
+
+Note object (DynamoDB item)
+  userId      (partition key)  Cognito "sub"
+  noteId      (sort key)       uuid4
+  text        cleaned transcript
+  rawText     original transcription
+  title       AI title
+  summary     AI one-sentence summary
+  status      "Planned" | "Done"
+  todos       [ { text, done } ]
+  createdAt   ISO-8601 UTC
+  updatedAt   ISO-8601 UTC
+  audioKey    audio/<userId>/<noteId>.<ext>
+
+localStorage keys
+  voicetonote_auth   { email, sub, accessToken, idToken, refreshToken }
+  voicetonote_notes  cached NoteItem[] for instant load
+
+
+================================================================================
+6. CODE MAP (what to open during the code section of the talk)
+================================================================================
+INFRASTRUCTURE
+  template.yaml ................ all 12 AWS resources + IAM + outputs
+                                 (Cognito pool/client, S3 + policy + lifecycle,
+                                  DynamoDB, HTTP API + JWT authorizer,
+                                  4 Lambdas, Lambda permission, custom resource,
+                                  CloudWatch event rule)
+  samconfig.toml ............... deploy settings
+BACKEND  (Python, boto3)
+  get_upload_url.py ............ JWT → userId, presigned S3 PUT
+  start_transcription.py ....... S3 event → Transcribe job
+  process_transcript.py ........ Transcribe result → Bedrock prompt → DynamoDB
+  notes_api.py ................. CRUD + AI re-structure on edit
+FRONTEND (React + TS)
+  src/App.tsx .................. providers + routes
+  src/Pages/LoginPage.tsx ...... sign in
+  src/Pages/SignupPage.tsx ..... sign up + email confirmation
+  src/Pages/NotesPage.tsx ...... board, polling, search, pull-to-refresh
+  src/Pages/NotesDetail.tsx .... edit, tasks, status, delete
+  src/Components/VoiceRec.tsx .. MediaRecorder + upload
+  src/Components/NoteCard.tsx .. card + todo checkboxes
+  src/Components/ProcessingCard.tsx  "processing" placeholder
+  src/Components/ProtectedRoute.tsx
+  src/context/AuthContext.tsx ... session + silent refresh
+  src/context/ThemeContext.tsx .. dark/light theme
+  src/services/cognitoAuth.ts ... Cognito REST calls (no SDK)
+  src/services/api.ts ........... fetch wrapper, 401 retry, API functions
+  src/services/notesCache.ts .... localStorage cache layer
+CI / TOOLING
+  .github/workflows/ci.yml ..... install → type-check/build → tests
+
+
+================================================================================
+7. SECURITY & DESIGN DECISIONS (good Q&A answers)
+================================================================================
+- Auth: Cognito issues JWTs; API Gateway validates them before Lambda runs.
+  Every Lambda also derives userId from the token — users can only see their
+  own notes (DynamoDB partition key = userId).
+- Uploads: presigned URLs are short-lived (5 min) and scoped to one object key;
+  audio bypasses Lambda/API Gateway entirely.
+- S3: CORS for the browser; lifecycle deletes audio after 7 days; bucket policy
+  lets Transcribe read objects.
+- IAM: least privilege per function (S3 PutObject only for upload URL,
+  DynamoDB CRUD only for the notes functions, etc.).
+- Resilience: LLM failure still saves the raw note; optimistic UI with rollback;
+  token auto-refresh; notes cache for instant/offline-ish load.
+- Cost: DynamoDB on-demand, Lambda per request, S3 lifecycle, no EC2/RDS →
+  idle cost ≈ $0 (only storage/requests you actually use).
+
+
+================================================================================
+8. PRESENTATION PLAN (your requested order: website → Miro → code)
+================================================================================
+SETUP
+  - Frontend running locally (npm run dev, mic works on localhost/HTTPS).
+  - A clean account with 0–2 notes so the demo looks tidy.
+  - Miro board open in a second tab.
+  - Code editor open with the key files already in tabs.
+
+── PART 1: LIVE WEBSITE DEMO (≈3–4 min) ────────────────────────────────────────
+  1. Show /login → sign in (mention Cognito + email verification on signup).
+  2. Land on the board: Planned / Done columns, search, dark mode toggle.
+  3. Press Rec and say a realistic note, e.g.:
+       "Okay so, um, I'm planning to, like, finish the report tomorrow and
+        then email it to Sarah, you know."
+     Stop → point out "Processing in AWS…" and the placeholder card.
+  4. Talk while it processes (this is your pipeline explanation on screen):
+       "Right now the audio is in S3, Transcribe is converting speech to text,
+        and Bedrock is cleaning it up." (~5–20 s)
+  5. The card appears: title, summary, cleaned transcript, extracted todos,
+     status = Planned. Read it out — the filler words are gone.
+  6. Tick the todos → card moves to Done automatically.
+  7. Open the note → edit the transcript → Save → show AI re-structuring.
+  8. Delete a note with the confirm modal. Mention audio expires from S3 in 7d.
+  9. Refresh the page → notes still there (cache + DynamoDB).
+
+── PART 2: MIRO ARCHITECTURE (≈3–5 min) ───────────────────────────────────────
+  Draw / walk these 7 columns left → right (see Section 2 diagram):
+    [Browser] → [Cognito] → [API Gateway] → [Lambda] → [S3] → [Transcribe]
+             → [EventBridge] → [Bedrock] → [DynamoDB]
+  Say:
+    - "The request path is synchronous for listings/edits, but the AI work is
+       asynchronous — the browser never waits on Transcribe or Bedrock."
+    - "S3 is the trigger, EventBridge carries the completion event; this is a
+       classic event-driven pipeline."
+    - "Everything is pay-per-use; nothing runs when nobody is using the app."
+    - "Cross-region detail: app stack in af-south-1, Bedrock in us-east-1
+       because Nova Micro isn't available in Cape Town."
+    - "Infrastructure is code — template.yaml recreates the whole backend."
+
+── PART 3: CODE WALKTHROUGH (≈4–6 min) ────────────────────────────────────────
+  Show in this order (keeps the story linear):
+    1. template.yaml — skim resource list, highlight the event wiring and
+       the S3→Lambda custom resource (a real engineering challenge).
+    2. get_upload_url.py — presigned URL + userId from JWT.
+    3. start_transcription.py — S3 key → job name → Transcribe.
+    4. process_transcript.py — the prompt + JSON contract + graceful fallback
+       + DynamoDB put_item. (This is the "brain" — spend the most time here.)
+    5. notes_api.py — CRUD + AI re-structure on edit.
+    6. VoiceRec.tsx — getUserMedia → MediaRecorder → presigned PUT.
+    7. api.ts — 401 refresh-and-retry wrapper; NotesPage.tsx polling loop.
+  Close with: CI pipeline, cost story, and "what I'd add next".
+
+── PART 4: CLOSE (≈1 min) ─────────────────────────────────────────────────────
+  - Recap the three pillars: serverless, event-driven, AI-organised.
+  - One metric: idle cost ~$0; note ready in seconds.
+  - Future work: streaming transcription, S3 retention/playback, sharing,
+    offline queue, unit tests for the prompt/JSON parser.
+
+
+================================================================================
+9. MIRO BOARD — COPY-PASTE CONTENT
+================================================================================
+Boxes (with short labels):
+  [Browser / React SPA]      MediaRecorder, localStorage cache, polling
+  [Amazon Cognito]           Sign up, verify email, login, JWT
+  [API Gateway HTTP API]     JWT authorizer, CORS
+  [Lambda: get_upload_url]   Presigned S3 URL
+  [Amazon S3]                audio/<user>/<note>.webm, 7-day lifecycle
+  [Lambda: start_transcription]  S3 event handler
+  [Amazon Transcribe]        speech → text (en-US)
+  [EventBridge]              "Transcribe Job State Change: COMPLETED"
+  [Lambda: process_transcript]   fetch transcript, call LLM, save
+  [Amazon Bedrock]           Nova Micro → title/summary/status/todos
+  [Amazon DynamoDB]          notes table (userId + noteId)
+  [Lambda: notes_api]        GET /notes, GET/PUT/DELETE /notes/{id}
+
+Arrows:
+  Browser → Cognito        "sign up / login"
+  Browser → API Gateway    "Bearer IdToken"
+  API Gateway → get_upload_url → S3   "presigned URL"
+  Browser → S3             "PUT audio (direct)"
+  S3 → start_transcription "ObjectCreated"
+  start_transcription → Transcribe    "StartTranscriptionJob"
+  Transcribe → EventBridge "job COMPLETED"
+  EventBridge → process_transcript
+  process_transcript → Bedrock        "structure prompt"
+  process_transcript → DynamoDB       "put_item"
+  Browser → API Gateway → notes_api → DynamoDB   "poll / CRUD"
+
+
+================================================================================
+10. DEMO SCRIPT — ONE PARAGRAPH YOU CAN READ
+================================================================================
+"VoiceToNote is a serverless voice-notes app. When I press record, the browser
+captures audio and uploads it straight to S3 using a short-lived presigned URL,
+so the file never touches my API. S3 fires a Lambda that starts Amazon
+Transcribe. When transcription completes, EventBridge wakes a second Lambda,
+which sends the raw text to Amazon Bedrock. The model removes filler words,
+writes a title and summary, decides whether the note is Planned or Done, and
+extracts action items as JSON. That result is saved to DynamoDB. The React app,
+which has been polling the API, picks it up in a few seconds and shows the
+organised note. Authentication is Cognito, everything is defined in a SAM
+template, and because it's all pay-per-request, the idle cost is essentially
+zero."
+
+
+================================================================================
+11. LIKELY QUESTIONS & SHORT ANSWERS
+================================================================================
+Q: Why presigned URLs instead of uploading through Lambda?
+A: Cheaper and faster — no 6 MB API payload limits, no Lambda time spent
+   streaming audio; the browser uploads directly to S3.
+
+Q: Why EventBridge instead of polling Transcribe inside a Lambda?
+A: Transcribe jobs can take longer than a Lambda should sleep. Event-driven
+   completion keeps Lambdas short and cost low.
+
+Q: What if the AI call fails?
+A: process_transcript catches it and saves the raw transcript with status
+   "Planned", so the user still gets the note.
+
+Q: How is user data isolated?
+A: Cognito "sub" is the DynamoDB partition key; every query is scoped to the
+   authenticated user. S3 keys are namespaced audio/<userId>/.
+
+Q: Why is Bedrock in a different region?
+A: The configured model (Amazon Nova Micro) isn't available in af-south-1, so
+   only the AI call goes to us-east-1; data storage stays in Cape Town.
+
+Q: How do you deploy?
+A: sam build && sam deploy for the backend; frontend built with Vite and
+   hosted statically. GitHub Actions runs type-check/build + tests on pushes
+   and PRs to main/develop.
+
+Q: What was the hardest part?
+A: Wiring S3 → Lambda without a CloudFormation circular dependency, so it's
+   done with a custom resource that creates the bucket notification after the
+   Lambda permission exists. Also handling cross-region Transcribe/Bedrock.
+
+Q: What would you add next?
+A: Real-time streaming transcription, note sharing/teams, audio playback,
+   offline recording queue, and automated tests around the LLM JSON parsing.
+
+
+================================================================================
+12. QUICK NUMBERS TO MEMORISE
+================================================================================
+  4 Lambda functions          1 HTTP API           1 DynamoDB table
+  1 S3 bucket (7-day audio)   1 Transcribe job per note
+  1 Bedrock call per note     5-second poll, 90-second timeout
+  Presigned URL 300 s         Lambda: 256 MB, ARM64, Python 3.12
+  Idle cost ≈ $0
+
+================================================================================
+END OF FILE
+================================================================================

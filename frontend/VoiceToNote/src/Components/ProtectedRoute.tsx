@@ -10,12 +10,10 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading } = useAuth();
 
-  // Still reading auth from localStorage , wait before deciding
   if (loading) {
     return <div style={{ textAlign: "center", marginTop: "40px" }}>Loading...</div>;
   }
 
-  // No user found — kick to login
   if (!user) {
     return <Navigate to="/login" replace />;
   }

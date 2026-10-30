@@ -1,7 +1,3 @@
-// Root of the app. Sets up providers and defines all routes.
-// Public routes: /login, /signup
-// Protected routes (require login): /, /note/:id
-
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import { ThemeProvider } from "./context/ThemeContext.tsx";

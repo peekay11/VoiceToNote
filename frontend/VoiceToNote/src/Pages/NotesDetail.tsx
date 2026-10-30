@@ -51,7 +51,6 @@ const NotesDetail = () => {
     setSaving(true);
     setActionError("");
     try {
-      // Backend will clean and re-structure via AI — we get updated fields back
       const updated = await updateNote(note.id, { text: editText } as Parameters<typeof updateNote>[1]);
       const changes: Partial<NoteItem> = {
         title: (updated as unknown as NoteItem & { title?: string }).title || note.title,
@@ -98,7 +97,6 @@ const NotesDetail = () => {
     }
   };
 
-  // Toggles a single todo and auto-moves the note to Done once every task is complete.
   const handleToggleTodo = async (index: number) => {
     if (!note) return;
     setActionError("");
@@ -149,7 +147,6 @@ const NotesDetail = () => {
 
   return (
     <div className="detail-page">
-      {/* Delete confirmation modal */}
       {showDeleteModal && (
         <ConfirmModal
           message="Delete this note? This cannot be undone."
@@ -159,7 +156,6 @@ const NotesDetail = () => {
         />
       )}
 
-      {/* Top navbar */}
       <header className="detail-navbar">
         <button className="detail-back-btn" onClick={() => navigate("/")}>
           <RiArrowLeftLine size={16} /> Back
@@ -174,7 +170,6 @@ const NotesDetail = () => {
       </header>
 
       <div className="detail-content">
-        {/* Status badge + toggle button */}
         <div className="detail-status-row">
           <span className={`status-pill${isDone ? " status-pill--done" : ""}`}>
             {isDone ? <RiCheckLine size={12} /> : <RiTimeLine size={12} />}
@@ -217,7 +212,6 @@ const NotesDetail = () => {
           </>
         )}
 
-        {/* Cleaned transcript */}
         <h3 className="detail-section-title">Transcript</h3>
 
         {editing ? (
@@ -253,7 +247,6 @@ const NotesDetail = () => {
 
         {actionError && <p className="detail-error">{actionError}</p>}
 
-        {/* Edit + Delete actions */}
         {!editing && (
           <div className="detail-actions">
             <button className="action-btn action-btn--primary" onClick={() => setEditing(true)}>

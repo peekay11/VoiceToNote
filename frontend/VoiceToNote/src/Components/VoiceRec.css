@@ -80,7 +80,7 @@
   cursor: pointer;
   font-family: inherit;
   transition: background 0.15s, color 0.15s;
-  order: -1; /* sits above the circle button */
+  order: -1;
 }
 
 .rec-cancel-btn:hover {
@@ -89,7 +89,7 @@
   border-color: var(--danger-text);
 }
 
-/* Status text shown below the button */
+/* Status text */
 .rec-status {
   font-size: 12px;
   color: var(--text-muted);

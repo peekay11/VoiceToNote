@@ -1,11 +1,7 @@
-// Talks directly to the AWS Cognito REST API for sign up, sign in, and token refresh.
-// No AWS SDK needed — just plain fetch calls with the right headers.
-
 const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
 const REGION = import.meta.env.VITE_AWS_REGION || "us-east-1";
 const COGNITO_URL = `https://cognito-idp.${REGION}.amazonaws.com/`;
 
-// Shape of a successful Cognito auth response
 interface CognitoTokens {
   AccessToken: string;
   IdToken: string;
@@ -19,12 +15,11 @@ interface CognitoResponse {
   __type?: string;
 }
 
-// Sends a request to Cognito. `target` is the Cognito action name (e.g. "SignUp").
 async function cognitoRequest(
   target: string,
   payload: Record<string, unknown>
 ): Promise<CognitoResponse> {
-  // No client ID means we're running locally without .env — return mock tokens
+  // Local development without .env uses mock tokens.
   if (!CLIENT_ID) {
     if (target === "InitiateAuth") {
       return {
@@ -56,7 +51,6 @@ async function cognitoRequest(
   return data;
 }
 
-// Creates a new user account. Cognito sends a verification email automatically.
 export async function signUp(email: string, password: string) {
   return cognitoRequest("SignUp", {
     ClientId: CLIENT_ID,
@@ -66,7 +60,6 @@ export async function signUp(email: string, password: string) {
   });
 }
 
-// Verifies the email using the 6-digit code Cognito sent after sign up.
 export async function confirmSignUp(email: string, verificationCode: string) {
   return cognitoRequest("ConfirmSignUp", {
     ClientId: CLIENT_ID,
@@ -75,7 +68,6 @@ export async function confirmSignUp(email: string, verificationCode: string) {
   });
 }
 
-// Signs the user in and returns three tokens: access, id, and refresh.
 export async function signIn(email: string, password: string) {
   const response = await cognitoRequest("InitiateAuth", {
     AuthFlow: "USER_PASSWORD_AUTH",
@@ -93,12 +85,9 @@ export async function signIn(email: string, password: string) {
   };
 }
 
-// Uses the refresh token to get a new access + id token when the current ones expire.
-// Cognito ID tokens expire after 1 hour by default.
 export async function refreshSession(
   refreshToken: string
 ): Promise<{ accessToken: string; idToken: string }> {
-  // Skip real network call for mock tokens (local dev without .env)
   if (!CLIENT_ID || refreshToken === "mock-refresh-token") {
     return { accessToken: "mock-access-token", idToken: "mock-id-token" };
   }

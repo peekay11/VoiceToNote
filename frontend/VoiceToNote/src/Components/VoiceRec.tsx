@@ -32,7 +32,7 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      // onstop fires for both Save and Cancel — cancelled flag prevents upload
+      // onstop runs for both save and cancel.
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop()); // release mic
         if (!cancelledRef.current) {
@@ -52,7 +52,6 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
     }
   };
 
-  // Tracks whether the current stop was a cancel (discard) or a save (upload)
   const cancelledRef = useRef(false);
 
   const stopRecording = () => {
@@ -94,7 +93,6 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
 
   return (
     <div className="voicerec">
-      {/* Cancel button — only visible while recording */}
       {recording && (
         <button
           type="button"
@@ -107,7 +105,6 @@ const VoiceRec: React.FC<VoiceRecProps> = ({ onUploadSuccess }) => {
         </button>
       )}
 
-      {/* Main circle button */}
       <button
         type="button"
         className={`rec-btn${recording ? " rec-btn--recording" : ""}${uploading ? " rec-btn--uploading" : ""}`}

@@ -2,7 +2,7 @@ import os
 import urllib.parse
 import boto3
 
-# Use the same region as the bucket so Transcribe can access the audio directly
+# Transcribe runs in the same region as the bucket.
 TRANSCRIBE_REGION = os.environ.get("TRANSCRIBE_REGION", "af-south-1")
 transcribe_client = boto3.client("transcribe", region_name=TRANSCRIBE_REGION)
 
@@ -11,7 +11,6 @@ def lambda_handler(event, context):
         bucket = record["s3"]["bucket"]["name"]
         key = urllib.parse.unquote_plus(record["s3"]["object"]["key"])
 
-        # Format: audio/<userId>/<noteId>.<ext>
         parts = key.split("/")
         if len(parts) < 3:
             continue

@@ -32,25 +32,19 @@ const NotesPage = () => {
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // true only on the very first load when there's no cache yet
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // Each entry is a placeholder card shown while audio is being processed by AWS
   const [pendingCardIds, setPendingCardIds] = useState<string[]>([]);
 
-  // Tracks IDs already in state so we know when a new note arrives from the API
   const knownNoteIdsRef = useRef<Set<string>>(new Set());
 
-  // ID of the note pending deletion — drives the confirm modal
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
 
-  // Pull-to-refresh state
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const touchStartYRef = useRef<number | null>(null);
   const isPullingRef = useRef(false);
 
-  // Active polling timer refs so we can cancel them on unmount
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollStartRef = useRef<number>(0);
 
@@ -62,7 +56,6 @@ const NotesPage = () => {
     try {
       const freshNotes = await fetchAndCacheNotes();
 
-      // Remove one placeholder card for each genuinely new note that arrived
       const newNotes = freshNotes.filter((n) => !knownNoteIdsRef.current.has(n.id));
       if (newNotes.length > 0) {
         setPendingCardIds((prev) => prev.slice(newNotes.length));
@@ -72,13 +65,11 @@ const NotesPage = () => {
       setNotes(freshNotes);
       return freshNotes;
     } catch {
-      // API failed — keep showing whatever is already on screen (cache or previous fetch)
       return null;
     }
   }, []);
 
   useEffect(() => {
-    // Show cached notes immediately so the UI isn't blank
     const cached = getCachedNotes();
     if (cached.length > 0) {
       knownNoteIdsRef.current = new Set(cached.map((n) => n.id));
@@ -86,7 +77,6 @@ const NotesPage = () => {
       setInitialLoading(false);
     }
 
-    // Always refresh from the API in the background
     refreshFromApi().finally(() => setInitialLoading(false));
   }, [refreshFromApi]);
 
@@ -102,9 +92,8 @@ const NotesPage = () => {
     (pendingCount: number) => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
 
-      if (pendingCount === 0) return; // nothing pending, stop
+      if (pendingCount === 0) return;
       if (Date.now() - pollStartRef.current > POLL_TIMEOUT) {
-        // Timed out — remove all stuck placeholder cards
         setPendingCardIds([]);
         return;
       }
@@ -112,13 +101,11 @@ const NotesPage = () => {
       pollTimerRef.current = setTimeout(async () => {
         const fresh = await refreshFromApi();
         if (fresh !== null) {
-          // Re-read pendingCardIds from state via the setter's callback form
           setPendingCardIds((prev) => {
             schedulePoll(prev.length);
             return prev;
           });
         } else {
-          // Fetch failed — retry anyway
           setPendingCardIds((prev) => {
             schedulePoll(prev.length);
             return prev;
@@ -130,10 +117,9 @@ const NotesPage = () => {
   );
 
 
-  const PULL_THRESHOLD = 72; // px of drag needed to trigger a refresh
+  const PULL_THRESHOLD = 72;
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // Only start tracking if we're already scrolled to the top
     if (window.scrollY === 0) {
       touchStartYRef.current = e.touches[0].clientY;
       isPullingRef.current = false;
@@ -146,7 +132,6 @@ const NotesPage = () => {
       const delta = e.touches[0].clientY - touchStartYRef.current;
       if (delta > 0) {
         isPullingRef.current = true;
-        // Apply resistance: full drag at start, slows down as you pull further
         setPullDistance(Math.min(delta * 0.45, PULL_THRESHOLD + 20));
       }
     },
@@ -170,15 +155,15 @@ const NotesPage = () => {
 
 
   const handleDelete = async (e: React.MouseEvent, noteId: string) => {
-    e.preventDefault(); // prevent Link navigation
-    setDeletingNoteId(noteId); // open confirm modal
+    e.preventDefault();
+    setDeletingNoteId(noteId);
   };
 
   const confirmDelete = async () => {
     if (!deletingNoteId) return;
     try {
       await deleteNote(deletingNoteId);
-      removeCachedNote(deletingNoteId); // keep cache in sync
+      removeCachedNote(deletingNoteId);
       setNotes((prev) => prev.filter((n) => n.id !== deletingNoteId));
     } catch {
       alert("Failed to delete. Please try again.");
@@ -198,14 +183,12 @@ const NotesPage = () => {
       todos.length > 0 && todos.every((todo) => todo.done) ? "Done" : "Planned";
     const changes = { todos, status };
 
-    // Update instantly so the card can move between Planned and Done
     setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, ...changes } : n)));
     updateCachedNote(noteId, changes);
 
     try {
       await updateNote(noteId, changes);
     } catch {
-      // Roll back if the API call fails
       setNotes((prev) => prev.map((n) => (n.id === noteId ? note : n)));
       updateCachedNote(noteId, { todos: note.todos, status: note.status });
       alert("Failed to update task. Please try again.");
@@ -213,10 +196,8 @@ const NotesPage = () => {
   };
 
   const handleUploadSuccess = () => {
-    // Add a placeholder card right away while AWS processes the audio
     setPendingCardIds((prev) => {
       const next = [...prev, `pending-${Date.now()}`];
-      // Kick off the polling loop for the new pending card
       pollStartRef.current = Date.now();
       schedulePoll(next.length);
       return next;
@@ -248,7 +229,6 @@ const NotesPage = () => {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Delete confirmation modal */}
       {deletingNoteId && (
         <ConfirmModal
           message="Delete this note? This cannot be undone."
@@ -258,7 +238,6 @@ const NotesPage = () => {
         />
       )}
 
-      {/* Pull-to-refresh indicator */}
       <div
         className="ptr-indicator"
         style={{

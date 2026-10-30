@@ -94,7 +94,7 @@
   flex: 1;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 24px 140px; /* extra bottom padding for the floating rec button */
+  padding: 0 24px 140px;
   width: 100%;
 }
 
@@ -210,7 +210,7 @@
   .navbar-user { display: none; }
 }
 
-/*  Pull-to-refresh */
+/* Pull-to-refresh */
 .ptr-indicator {
   position: fixed;
   top: -48px;

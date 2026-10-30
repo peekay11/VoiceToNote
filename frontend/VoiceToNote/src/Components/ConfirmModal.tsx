@@ -1,6 +1,3 @@
-// Reusable confirmation dialog styled to match the app's design
-
-
 import "./ConfirmModal.css";
 
 interface ConfirmModalProps {

@@ -6,18 +6,17 @@ import { clearNotesCache } from "../services/notesCache.ts";
 
 export interface AuthUser {
   email: string;
-  sub: string;       // Cognito user ID
+  sub: string;
   accessToken: string;
-  idToken: string;   // Sent as Bearer token on every API request
+  idToken: string;
   refreshToken: string;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
-  loading: boolean;  // true while we check localStorage on first load
+  loading: boolean;
   login: (email: string, tokens: { accessToken: string; idToken: string; refreshToken?: string; sub?: string }) => void;
   logout: () => void;
-  refresh: () => Promise<boolean>;
 }
 
 
@@ -26,7 +25,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_STORAGE_KEY = "voicetonote_auth";
 
 
-// Reads the exp claim from a JWT without any library
 function getTokenExpiry(token: string): number {
   try {
     const payloadBase64 = token.split(".")[1];
@@ -37,7 +35,6 @@ function getTokenExpiry(token: string): number {
   }
 }
 
-// Returns true if the token expires within the next 5 minutes
 function isExpiringSoon(token: string): boolean {
   const expiresAt = getTokenExpiry(token);
   if (!expiresAt) return false;
@@ -50,7 +47,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Gets new access + id tokens using the stored refresh token
   const refresh = async (): Promise<boolean> => {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
     if (!raw) return false;
@@ -70,8 +66,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // On app load, restore the session from localStorage.
-  // If the id token is about to expire, refresh it silently before showing the app.
   useEffect(() => {
     const restoreSession = async () => {
       try {
@@ -83,7 +77,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isExpiringSoon(stored.idToken) && stored.refreshToken) {
           const refreshed = await refresh();
           if (!refreshed) {
-            // Refresh token also expired — clear session, send to /login
             localStorage.removeItem(AUTH_STORAGE_KEY);
             setUser(null);
             return;
@@ -101,8 +94,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     restoreSession();
   }, []);
 
-  // Syncs state when api.ts refreshes tokens in the background (same-tab storage event)
-  // Also listens for auth:logout fired when the refresh token itself has expired
   useEffect(() => {
     const onTokensUpdated = (e: StorageEvent) => {
       if (e.key === AUTH_STORAGE_KEY && e.newValue) {
@@ -145,12 +136,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
-    clearNotesCache(); // don't leave this user's notes visible to the next login
+    clearNotesCache();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

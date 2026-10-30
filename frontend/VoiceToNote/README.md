@@ -1,32 +1,88 @@
-# React + TypeScript + Vite
+# VoiceToNote Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The web client for VoiceToNote. Built with React 19, TypeScript and Vite. It
+records audio in the browser, uploads it to the backend, and displays notes
+organised into Planned and Done.
 
-Currently, two official plugins are available:
+For the full project overview, architecture and backend setup, see the
+[main README](../../Readme.md).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Requirements
 
-## React Compiler
+- Node.js 20 or newer
+- A deployed VoiceToNote backend (see the main README)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Setup
 
-## Expanding the Oxlint configuration
+Install dependencies:
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Create a `.env` file in this folder and fill in the values from the backend
+deployment outputs:
+
+```env
+VITE_API_URL="https://your-api-id.execute-api.af-south-1.amazonaws.com"
+VITE_COGNITO_CLIENT_ID="your-user-pool-client-id"
+VITE_AWS_REGION=af-south-1
+VITE_COGNITO_USER_POOL_ID="your-user-pool-id"
+```
+
+Use the API URL exactly as printed, with no trailing slash.
+
+## Run
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:5173`. The microphone only works on `localhost` or over
+HTTPS.
+
+## Scripts
+
+```bash
+npm run dev       # start the development server
+npm run build     # type-check and build for production (output in dist/)
+npm run preview   # preview the production build
+npm run lint      # run oxlint
+npm test          # run tests with Vitest
+```
+
+## Structure
+
+```
+src/
+  Pages/
+    LoginPage.tsx      sign in
+    SignupPage.tsx     create account and confirm email
+    NotesPage.tsx      notes board, recording, polling, search
+    NotesDetail.tsx    note detail, editing, tasks, status, delete
+  Components/
+    VoiceRec.tsx       microphone recording and upload
+    NoteCard.tsx       note card with task checkboxes
+    ProcessingCard.tsx placeholder shown while a note is processed
+    SearchBar.tsx      search input
+    ConfirmModal.tsx   confirmation dialog
+    ProtectedRoute.tsx redirects signed-out users to login
+  context/
+    AuthContext.tsx    authentication state and token refresh
+    ThemeContext.tsx   light and dark theme
+  services/
+    cognitoAuth.ts     Cognito sign up, sign in and refresh calls
+    api.ts             API requests with automatic token refresh
+    notesCache.ts      localStorage cache for notes
+  App.tsx              routes and providers
+  main.tsx             entry point
+```
+
+## Notes
+
+- Authentication tokens are stored in `localStorage` and refreshed
+  automatically when they expire.
+- Notes are cached in `localStorage` so the list appears immediately on load and
+  while the app fetches fresh data from the API.
+- Audio is recorded as `audio/webm` and uploaded directly to Amazon S3 using a
+  presigned URL from the backend.
